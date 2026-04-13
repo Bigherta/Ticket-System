@@ -151,7 +151,7 @@ private:
         return node.Keys[0];
     }
 
-    void fix_parent(int node_pos, sjtu::vector<int> &trace_index)
+    void fix_parent(int node_pos, sjtu::vector<int> trace_index)
 {
     // 提前拿到新的最小值，避免在循环中重复读取
     sjtu::pair<T, int> new_min = subtree_min_key(node_pos); 
@@ -542,12 +542,17 @@ public:
         for (int i = upper_index; i < node.size; ++i)
             node.Keys[i - 1] = node.Keys[i];
         --node.size;
+
+        // Persist leaf mutation first so subtree_min_key sees fresh data.
+        BPTree.update(node, node_pos);
+
+        // If the deleted key was the first key, subtree minimum may have changed.
+        if (upper_index == 1)
+            fix_parent(node_pos, trace_index);
+
         int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
         {
-            BPTree.update(node, node_pos);
-            if (upper_index == 1)
-                fix_parent(node_pos, trace_index);
             return;
         }
         // Node underflow, need to merge with sibling
