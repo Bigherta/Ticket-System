@@ -12,6 +12,10 @@ add_executable(ticket_system
 	BPlusTree/main.cpp
 )
 
+set_target_properties(ticket_system PROPERTIES
+	OUTPUT_NAME code
+)
+
 target_include_directories(ticket_system PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/BPlusTree
 )
