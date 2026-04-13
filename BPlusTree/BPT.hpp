@@ -4,7 +4,7 @@
 #include "BPT_MemoryRiver.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
-constexpr int order = 5;
+constexpr int order = 128;
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
@@ -37,6 +37,10 @@ template<class T>
 class BPT
 {
 private:
+    static constexpr int max_keys = order - 1;
+    static constexpr int min_keys_non_root =
+        ((order - 1) / 2) + (((order - 1) % 2) ? 1 : 0); // ceil((order - 1) / 2)
+
     template<int M>
     struct Node
     {
@@ -123,7 +127,7 @@ private:
             parentNode.Keys[pos] = midKey;
             parentNode.children[pos + 1] = new_node_pos;
             ++parentNode.size;
-            if (parentNode.size == order) // parent node overflow, need to split
+            if (parentNode.size > max_keys) // parent node overflow, need to split
                 split(parentNode, node.parent);
             else
                 BPTree.update(parentNode, node.parent);
@@ -212,7 +216,7 @@ private:
             {
                 Node<order> leftSibling;
                 BPTree.read(leftSibling, parentNode.children[index - 1]);
-                if (leftSibling.size > order / 2) // borrow from left sibling
+                if (leftSibling.size > min_keys_non_root) // borrow from left sibling
                 {
                     for (int i = node.size; i > 0; --i)
                         node.Keys[i] = node.Keys[i - 1];
@@ -232,7 +236,7 @@ private:
             {
                 Node<order> rightSibling;
                 BPTree.read(rightSibling, parentNode.children[index + 1]);
-                if (rightSibling.size > order / 2) // borrow from right sibling
+                if (rightSibling.size > min_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = rightSibling.Keys[0];
                     for (int i = 0; i < rightSibling.size - 1; ++i)
@@ -264,7 +268,7 @@ private:
                 for (int i = index + 1; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < order / 2)
+                if (parentNode.size < min_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -292,7 +296,7 @@ private:
                 for (int i = index + 2; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < order / 2)
+                if (parentNode.size < min_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -311,7 +315,7 @@ private:
             {
                 Node<order> leftSibling;
                 BPTree.read(leftSibling, parentNode.children[index - 1]);
-                if (leftSibling.size > order / 2) // borrow from left sibling
+                if (leftSibling.size > min_keys_non_root) // borrow from left sibling
                 {
                    for (int i = node.size; i > 0; --i)
                         node.Keys[i] = node.Keys[i - 1];
@@ -338,7 +342,7 @@ private:
             {
                 Node<order> rightSibling;
                 BPTree.read(rightSibling, parentNode.children[index + 1]);
-                if (rightSibling.size > order / 2) // borrow from right sibling
+                if (rightSibling.size > min_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = parentNode.Keys[index];
                     node.children[node.size + 1] = rightSibling.children[0];
@@ -386,7 +390,7 @@ private:
                 for (int i = index + 1; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < order / 2)
+                if (parentNode.size < min_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -423,7 +427,7 @@ private:
                 for (int i = index + 2; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < order / 2)
+                if (parentNode.size < min_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -481,7 +485,7 @@ public:
                 node.Keys[i] = node.Keys[i - 1];
             node.Keys[insert_index] = keyValuePair;
             ++node.size;
-            if (node.size == order) // node overflow, need to split
+            if (node.size > max_keys) // node overflow, need to split
                 split(node, node_pos);
             else
                 BPTree.update(node, node_pos);
@@ -513,7 +517,7 @@ public:
         for (int i = upper_index; i < node.size; ++i)
             node.Keys[i - 1] = node.Keys[i];
         --node.size;
-        int min_size = order / 2; // minimum number of keys in a node
+        int min_size = min_keys_non_root; // minimum number of keys in a non-root node
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
         {
             BPTree.update(node, node_pos);
