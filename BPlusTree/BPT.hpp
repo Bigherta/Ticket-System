@@ -319,6 +319,10 @@ private:
                         node.children[i] = node.children[i - 1];
                     node.Keys[0] = parentNode.Keys[index - 1];
                     node.children[0] = leftSibling.children[leftSibling.size];
+                    Node<order> moveNode;
+                    BPTree.read(moveNode, node.children[0]);
+                    moveNode.parent = node_pos;
+                    BPTree.update(moveNode, node.children[0]);
                     parentNode.Keys[index - 1] = leftSibling.Keys[leftSibling.size - 1];
                     --leftSibling.size;
                     ++node.size;
@@ -343,6 +347,10 @@ private:
                         rightSibling.Keys[i] = rightSibling.Keys[i + 1];
                     for (int i = 0; i < rightSibling.size; ++i)
                         rightSibling.children[i] = rightSibling.children[i + 1];
+                    Node<order> moveNode;
+                    BPTree.read(moveNode, node.children[node.size + 1]);
+                    moveNode.parent = node_pos;
+                    BPTree.update(moveNode, node.children[node.size + 1]);
                     --rightSibling.size;
                     ++node.size;
                     BPTree.update(parentNode, node.parent);
@@ -362,7 +370,13 @@ private:
                 for (int i = 0; i < node.size; ++i)
                     leftSibling.Keys[old_left_size + 1 + i] = node.Keys[i];
                 for (int i = 0; i <= node.size; ++i)
+                {
                     leftSibling.children[old_left_size + 1 + i] = node.children[i];
+                    Node<order> moveNode;
+                    BPTree.read(moveNode, node.children[i]);
+                    moveNode.parent = parentNode.children[index - 1];
+                    BPTree.update(moveNode, node.children[i]);
+                }
                 leftSibling.size = old_left_size + node.size + 1;
                 BPTree.update(leftSibling, parentNode.children[index - 1]);
                 BPTree.Delete(node_pos);
@@ -393,7 +407,13 @@ private:
                 for (int i = 0; i < rightSibling.size; ++i)
                     node.Keys[old_node_size + 1 + i] = rightSibling.Keys[i];
                 for (int i = 0; i <= rightSibling.size; ++i)
+                {
                     node.children[old_node_size + 1 + i] = rightSibling.children[i];
+                    Node<order> moveNode;
+                    BPTree.read(moveNode, rightSibling.children[i]);
+                    moveNode.parent = node_pos;
+                    BPTree.update(moveNode, rightSibling.children[i]);
+                }
                 node.size = old_node_size + rightSibling.size + 1;
                 BPTree.update(node, node_pos);
                 BPTree.Delete(parentNode.children[index + 1]);
@@ -497,6 +517,8 @@ public:
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
         {
             BPTree.update(node, node_pos);
+            if(upper_index == 1)
+                fix_parent(node_pos, trace_index);
             return;
         }
         // Node underflow, need to merge with sibling
