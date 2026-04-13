@@ -152,41 +152,50 @@ private:
     }
 
     void fix_parent(int node_pos, sjtu::vector<int> &trace_index)
+{
+    // 提前拿到新的最小值，避免在循环中重复读取
+    sjtu::pair<T, int> new_min = subtree_min_key(node_pos); 
+    Node<order> node;
+    BPTree.read(node, node_pos);
+    
+    while (node.parent != -1)
     {
-        Node<order> node;
-        BPTree.read(node, node_pos);
-        while (node.parent != -1)
+        Node<order> parentNode;
+        BPTree.read(parentNode, node.parent);
+        int child_index = -1;
+        
+        if (!trace_index.empty())
         {
-            Node<order> parentNode;
-            BPTree.read(parentNode, node.parent);
-            int child_index = -1;
-            if (!trace_index.empty())
+            child_index = trace_index.back();
+            trace_index.pop_back();
+        }
+        
+        if (child_index < 0 || child_index > parentNode.size || parentNode.children[child_index] != node_pos)
+        {
+            for (int i = 0; i <= parentNode.size; ++i)
             {
-                child_index = trace_index.back();
-                trace_index.pop_back();
-            }
-            if (child_index < 0 || child_index > parentNode.size || parentNode.children[child_index] != node_pos)
-            {
-                for (int i = 0; i <= parentNode.size; ++i)
+                if (parentNode.children[i] == node_pos)
                 {
-                    if (parentNode.children[i] == node_pos)
-                    {
-                        child_index = i;
-                        break;
-                    }
+                    child_index = i;
+                    break;
                 }
             }
-            if (child_index <= 0)
-                return;
-            parentNode.Keys[child_index - 1] = subtree_min_key(node_pos);
-            BPTree.update(parentNode, node.parent);
-            if (child_index != 1)
-                return;
+        }
+        
+        if (child_index == 0)
+        {
             node_pos = node.parent;
             node = parentNode;
+            continue; 
         }
+        
+        parentNode.Keys[child_index - 1] = new_min;
+        BPTree.update(parentNode, node.parent);
+        
+        return; 
     }
-    void merge(Node<order> &node, sjtu::vector<int>& trace_index, int node_pos)
+}
+    void merge(Node<order> &node, sjtu::vector<int> &trace_index, int node_pos)
     {
         if (node.parent == -1)
         {
@@ -333,7 +342,7 @@ private:
                 BPTree.read(leftSibling, parentNode.children[index - 1]);
                 if (leftSibling.size > min_internal_keys_non_root) // borrow from left sibling
                 {
-                   for (int i = node.size; i > 0; --i)
+                    for (int i = node.size; i > 0; --i)
                         node.Keys[i] = node.Keys[i - 1];
                     for (int i = node.size + 1; i > 0; --i)
                         node.children[i] = node.children[i - 1];
@@ -537,7 +546,7 @@ public:
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
         {
             BPTree.update(node, node_pos);
-            if(upper_index == 1)
+            if (upper_index == 1)
                 fix_parent(node_pos, trace_index);
             return;
         }
