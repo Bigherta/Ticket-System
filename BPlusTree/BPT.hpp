@@ -37,9 +37,12 @@ template<class T>
 class BPT
 {
 private:
-    static constexpr int max_keys = order - 1;
-    static constexpr int min_keys_non_root =
-        ((order - 1) / 2) + (((order - 1) % 2) ? 1 : 0); // ceil((order - 1) / 2)
+    // Standard definition: order = maximum children count of an internal node.
+    static constexpr int max_children = order;
+    static constexpr int max_keys = max_children - 1;
+    static constexpr int min_children_non_root_internal = (max_children + 1) / 2; // ceil(m / 2)
+    static constexpr int min_internal_keys_non_root = min_children_non_root_internal - 1; // ceil(m / 2) - 1
+    static constexpr int min_leaf_keys_non_root = (max_keys + 1) / 2; // ceil((m - 1) / 2)
 
     template<int M>
     struct Node
@@ -135,6 +138,19 @@ private:
         BPTree.update(node, node_pos);
         BPTree.update(newNode, new_node_pos);
     }
+
+    sjtu::pair<T, int> subtree_min_key(int node_pos)
+    {
+        Node<order> node;
+        BPTree.read(node, node_pos);
+        while (!node.isLeaf)
+        {
+            node_pos = node.children[0];
+            BPTree.read(node, node_pos);
+        }
+        return node.Keys[0];
+    }
+
     void fix_parent(int node_pos, sjtu::vector<int> &trace_index)
     {
         Node<order> node;
@@ -162,7 +178,7 @@ private:
             }
             if (child_index <= 0)
                 return;
-            parentNode.Keys[child_index - 1] = node.Keys[0];
+            parentNode.Keys[child_index - 1] = subtree_min_key(node_pos);
             BPTree.update(parentNode, node.parent);
             if (child_index != 1)
                 return;
@@ -216,7 +232,7 @@ private:
             {
                 Node<order> leftSibling;
                 BPTree.read(leftSibling, parentNode.children[index - 1]);
-                if (leftSibling.size > min_keys_non_root) // borrow from left sibling
+                if (leftSibling.size > min_leaf_keys_non_root) // borrow from left sibling
                 {
                     for (int i = node.size; i > 0; --i)
                         node.Keys[i] = node.Keys[i - 1];
@@ -236,7 +252,7 @@ private:
             {
                 Node<order> rightSibling;
                 BPTree.read(rightSibling, parentNode.children[index + 1]);
-                if (rightSibling.size > min_keys_non_root) // borrow from right sibling
+                if (rightSibling.size > min_leaf_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = rightSibling.Keys[0];
                     for (int i = 0; i < rightSibling.size - 1; ++i)
@@ -268,7 +284,7 @@ private:
                 for (int i = index + 1; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < min_keys_non_root)
+                if (parentNode.size < min_internal_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -296,7 +312,7 @@ private:
                 for (int i = index + 2; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < min_keys_non_root)
+                if (parentNode.size < min_internal_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -315,7 +331,7 @@ private:
             {
                 Node<order> leftSibling;
                 BPTree.read(leftSibling, parentNode.children[index - 1]);
-                if (leftSibling.size > min_keys_non_root) // borrow from left sibling
+                if (leftSibling.size > min_internal_keys_non_root) // borrow from left sibling
                 {
                    for (int i = node.size; i > 0; --i)
                         node.Keys[i] = node.Keys[i - 1];
@@ -342,7 +358,7 @@ private:
             {
                 Node<order> rightSibling;
                 BPTree.read(rightSibling, parentNode.children[index + 1]);
-                if (rightSibling.size > min_keys_non_root) // borrow from right sibling
+                if (rightSibling.size > min_internal_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = parentNode.Keys[index];
                     node.children[node.size + 1] = rightSibling.children[0];
@@ -390,7 +406,7 @@ private:
                 for (int i = index + 1; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < min_keys_non_root)
+                if (parentNode.size < min_internal_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -427,7 +443,7 @@ private:
                 for (int i = index + 2; i < parentNode.size + 1; ++i)
                     parentNode.children[i - 1] = parentNode.children[i];
                 --parentNode.size;
-                if (parentNode.size < min_keys_non_root)
+                if (parentNode.size < min_internal_keys_non_root)
                 {
                     merge(parentNode, trace_index, parent_pos);
                 }
@@ -517,7 +533,7 @@ public:
         for (int i = upper_index; i < node.size; ++i)
             node.Keys[i - 1] = node.Keys[i];
         --node.size;
-        int min_size = min_keys_non_root; // minimum number of keys in a non-root node
+        int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
         {
             BPTree.update(node, node_pos);
