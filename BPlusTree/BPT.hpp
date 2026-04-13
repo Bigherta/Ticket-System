@@ -357,12 +357,13 @@ private:
             {
                 Node<order> leftSibling;
                 BPTree.read(leftSibling, parentNode.children[index - 1]);
-                leftSibling.Keys[leftSibling.size] = parentNode.Keys[index - 1];
-                for (int i = leftSibling.size + 1; i < leftSibling.size + node.size + 1; ++i)
-                    leftSibling.Keys[i] = node.Keys[i - leftSibling.size - 1];
-                leftSibling.size += node.size + 1;
-                for (int i = leftSibling.size + 1; i < leftSibling.size + node.size + 2; ++i)
-                    leftSibling.children[i] = node.children[i - leftSibling.size - 1];
+                int old_left_size = leftSibling.size;
+                leftSibling.Keys[old_left_size] = parentNode.Keys[index - 1];
+                for (int i = 0; i < node.size; ++i)
+                    leftSibling.Keys[old_left_size + 1 + i] = node.Keys[i];
+                for (int i = 0; i <= node.size; ++i)
+                    leftSibling.children[old_left_size + 1 + i] = node.children[i];
+                leftSibling.size = old_left_size + node.size + 1;
                 BPTree.update(leftSibling, parentNode.children[index - 1]);
                 BPTree.Delete(node_pos);
                 tree_size--;
@@ -387,12 +388,13 @@ private:
             {
                 Node<order> rightSibling;
                 BPTree.read(rightSibling, parentNode.children[index + 1]);
-                node.Keys[node.size] = parentNode.Keys[index];
-                for (int i = node.size + 1; i < node.size + rightSibling.size + 2; ++i)
-                    node.Keys[i] = rightSibling.Keys[i - node.size - 1];
-                node.size += rightSibling.size + 1;
-                for (int i = node.size + 1; i < node.size + rightSibling.size + 2; ++i)
-                    node.children[i] = rightSibling.children[i - node.size - 1];
+                int old_node_size = node.size;
+                node.Keys[old_node_size] = parentNode.Keys[index];
+                for (int i = 0; i < rightSibling.size; ++i)
+                    node.Keys[old_node_size + 1 + i] = rightSibling.Keys[i];
+                for (int i = 0; i <= rightSibling.size; ++i)
+                    node.children[old_node_size + 1 + i] = rightSibling.children[i];
+                node.size = old_node_size + rightSibling.size + 1;
                 BPTree.update(node, node_pos);
                 BPTree.Delete(parentNode.children[index + 1]);
                 tree_size--;
@@ -557,6 +559,7 @@ public:
                 keyValuePair = node.Keys[scan_index];
             }
         }
+        std::cout << '\n';
     }
 };
 #endif // BPT.hpp
