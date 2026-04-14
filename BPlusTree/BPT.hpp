@@ -63,7 +63,7 @@ private:
     };
     int root_pos = 2 * sizeof(int); // position of the root node in the file
     int tree_size = 0; // number of nodes in the tree
-    MemoryRiver<Node<order>> BPTree; // B+ tree with order 5
+    MemoryRiver<Node<order>> BPTree; // B+ tree with order 128
     void split(Node<order> &node, int node_pos)
     {
         int left_size = order / 2; // number of keys to keep in the left node
@@ -103,9 +103,11 @@ private:
                 BPTree.update(childNode, newNode.children[i]);
             }
         }
-        node.size = left_size;
-        // Insert the middle key into the parent node
+        // Capture middle key before shrinking the left node
         sjtu::pair<T, int> midKey = node.Keys[left_size];
+        node.size = left_size;
+        // Persist left node now so recursive splits won't be overwritten
+        BPTree.update(node, node_pos);
         if (node.parent == -1) // node is root, need to create new root
         {
             Node<order> newRoot;
@@ -114,9 +116,11 @@ private:
             newRoot.Keys[0] = midKey;
             newRoot.children[0] = node_pos;
             newRoot.children[1] = new_node_pos;
-            root_pos = node.parent = BPTree.write(newRoot);
+            root_pos = BPTree.write(newRoot);
             ++tree_size;
-            newNode.parent = node.parent;
+            node.parent = root_pos;
+            newNode.parent = root_pos;
+            // write updated parent pointers for the two children
             BPTree.update(node, node_pos);
             BPTree.update(newNode, new_node_pos);
         }
@@ -132,11 +136,10 @@ private:
             parentNode.Keys[pos] = midKey;
             parentNode.children[pos + 1] = new_node_pos;
             ++parentNode.size;
-            BPTree.update(node, node_pos);
-            BPTree.update(newNode, new_node_pos);
+            // parentNode updated: if it overflows, split it (recursive).
+            // Do NOT re-write child nodes here — they were persisted above.
             if (parentNode.size > max_keys) // parent node overflow, need to split
             {
-                is_parent_split = true;
                 split(parentNode, node.parent);
             }
             else
@@ -301,8 +304,6 @@ private:
                 else
                 {
                     BPTree.update(parentNode, parent_pos);
-                    if (index == 1)
-                        fix_parent(parent_pos, trace_index);
                 }
                 return;
             }
@@ -329,8 +330,6 @@ private:
                 else
                 {
                     BPTree.update(parentNode, parent_pos);
-                    if (index == 0)
-                        fix_parent(parent_pos, trace_index);
                 }
                 return;
             }
@@ -419,8 +418,6 @@ private:
                 else
                 {
                     BPTree.update(parentNode, parent_pos);
-                    if (index == 1)
-                        fix_parent(parent_pos, trace_index);
                 }
                 return;
             }
@@ -456,8 +453,6 @@ private:
                 else
                 {
                     BPTree.update(parentNode, parent_pos);
-                    if (index == 0)
-                        fix_parent(parent_pos, trace_index);
                 }
                 return;
             }
