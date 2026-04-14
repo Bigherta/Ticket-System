@@ -69,7 +69,7 @@ private:
         int left_size = order / 2; // number of keys to keep in the left node
         int right_size = node.size - left_size;
         int new_node_pos;
-
+        bool is_parent_split = false;
         // Create new node and move the right half of the keys to it
         Node<order> newNode;
         newNode.isLeaf = node.isLeaf;
@@ -131,12 +131,16 @@ private:
             parentNode.children[pos + 1] = new_node_pos;
             ++parentNode.size;
             if (parentNode.size > max_keys) // parent node overflow, need to split
+            {
+                is_parent_split = true;
                 split(parentNode, node.parent);
+            }
             else
                 BPTree.update(parentNode, node.parent);
         }
         BPTree.update(node, node_pos);
-        BPTree.update(newNode, new_node_pos);
+        if (!is_parent_split)
+            BPTree.update(newNode, new_node_pos);
     }
 
     sjtu::pair<T, int> subtree_min_key(int node_pos)
@@ -152,49 +156,49 @@ private:
     }
 
     void fix_parent(int node_pos, sjtu::vector<int> trace_index)
-{
-    // 提前拿到新的最小值，避免在循环中重复读取
-    sjtu::pair<T, int> new_min = subtree_min_key(node_pos); 
-    Node<order> node;
-    BPTree.read(node, node_pos);
-    
-    while (node.parent != -1)
     {
-        Node<order> parentNode;
-        BPTree.read(parentNode, node.parent);
-        int child_index = -1;
-        
-        if (!trace_index.empty())
+        // 提前拿到新的最小值，避免在循环中重复读取
+        sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
+        Node<order> node;
+        BPTree.read(node, node_pos);
+
+        while (node.parent != -1)
         {
-            child_index = trace_index.back();
-            trace_index.pop_back();
-        }
-        
-        if (child_index < 0 || child_index > parentNode.size || parentNode.children[child_index] != node_pos)
-        {
-            for (int i = 0; i <= parentNode.size; ++i)
+            Node<order> parentNode;
+            BPTree.read(parentNode, node.parent);
+            int child_index = -1;
+
+            if (!trace_index.empty())
             {
-                if (parentNode.children[i] == node_pos)
+                child_index = trace_index.back();
+                trace_index.pop_back();
+            }
+
+            if (child_index < 0 || child_index > parentNode.size || parentNode.children[child_index] != node_pos)
+            {
+                for (int i = 0; i <= parentNode.size; ++i)
                 {
-                    child_index = i;
-                    break;
+                    if (parentNode.children[i] == node_pos)
+                    {
+                        child_index = i;
+                        break;
+                    }
                 }
             }
+
+            if (child_index == 0)
+            {
+                node_pos = node.parent;
+                node = parentNode;
+                continue;
+            }
+
+            parentNode.Keys[child_index - 1] = new_min;
+            BPTree.update(parentNode, node.parent);
+
+            return;
         }
-        
-        if (child_index == 0)
-        {
-            node_pos = node.parent;
-            node = parentNode;
-            continue; 
-        }
-        
-        parentNode.Keys[child_index - 1] = new_min;
-        BPTree.update(parentNode, node.parent);
-        
-        return; 
     }
-}
     void merge(Node<order> &node, sjtu::vector<int> &trace_index, int node_pos)
     {
         if (node.parent == -1)
