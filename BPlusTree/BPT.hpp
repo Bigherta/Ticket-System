@@ -217,6 +217,10 @@ private:
                 BPTree.Delete(node_pos);
                 --tree_size;
             }
+            else
+            {
+                BPTree.update(node, node_pos);
+            }
             return;
         }
         Node<order> parentNode;
