@@ -117,6 +117,8 @@ private:
             root_pos = node.parent = BPTree.write(newRoot);
             ++tree_size;
             newNode.parent = node.parent;
+            BPTree.update(node, node_pos);
+            BPTree.update(newNode, new_node_pos);
         }
         else
         {
@@ -130,6 +132,8 @@ private:
             parentNode.Keys[pos] = midKey;
             parentNode.children[pos + 1] = new_node_pos;
             ++parentNode.size;
+            BPTree.update(node, node_pos);
+            BPTree.update(newNode, new_node_pos);
             if (parentNode.size > max_keys) // parent node overflow, need to split
             {
                 is_parent_split = true;
@@ -138,9 +142,6 @@ private:
             else
                 BPTree.update(parentNode, node.parent);
         }
-        BPTree.update(node, node_pos);
-        if (!is_parent_split)
-            BPTree.update(newNode, new_node_pos);
     }
 
     sjtu::pair<T, int> subtree_min_key(int node_pos)
@@ -254,8 +255,6 @@ private:
                     --leftSibling.size;
                     ++node.size;
                     BPTree.update(parentNode, node.parent);
-                    if (index == 1)
-                        fix_parent(node.parent, trace_index);
                     BPTree.update(leftSibling, parentNode.children[index - 1]);
                     BPTree.update(node, node_pos);
                     return;
@@ -274,8 +273,6 @@ private:
                     --rightSibling.size;
                     ++node.size;
                     BPTree.update(parentNode, node.parent);
-                    if (index == 0)
-                        fix_parent(node.parent, trace_index);
                     BPTree.update(rightSibling, parentNode.children[index + 1]);
                     BPTree.update(node, node_pos);
                     return;
@@ -360,8 +357,6 @@ private:
                     --leftSibling.size;
                     ++node.size;
                     BPTree.update(parentNode, node.parent);
-                    if (index == 1)
-                        fix_parent(node.parent, trace_index);
                     BPTree.update(leftSibling, parentNode.children[index - 1]);
                     BPTree.update(node, node_pos);
                     return;
@@ -387,8 +382,6 @@ private:
                     --rightSibling.size;
                     ++node.size;
                     BPTree.update(parentNode, node.parent);
-                    if (index == 0)
-                        fix_parent(node.parent, trace_index);
                     BPTree.update(rightSibling, parentNode.children[index + 1]);
                     BPTree.update(node, node_pos);
                     return;
