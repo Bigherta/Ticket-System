@@ -1,6 +1,7 @@
 #ifndef VALIDATOR_HPP
 #define VALIDATOR_HPP
 #include <string>
+#include "../Grammar/Token.hpp"
 class Validator
 {
 public:
@@ -135,5 +136,43 @@ public:
         int count = chinese_count(name);
         return count >= 2 && count <= 5;
     } // validate name format (2 to 5 Chinese characters)
+    /**
+     * @brief 检查数字字符串是否满足条件
+     * @param str 待检测字符串
+     * @param type 需要验证的数字类型（如 TRAINID、SEATNUM 等）
+     * @return true 如果字符串合法
+     */
+    static bool validate_number(const std::string &str, TokenType type) noexcept
+    {
+        if (str.empty() || str.size() > 6)
+            return false;
+        if (str[0] == '0' && str.size() > 1) // leading zeros are not allowed
+            return false;
+        for (char c: str)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(c)))
+            {
+                return false;
+            }
+        }
+        int num = std::stoi(str);
+        switch (type)
+        {
+            case PRIVILEGE:
+                return num >= 0 && num <= 10; // Privilege level should be between 0 and 10
+            case STATIONNUM:
+                return num >= 2 && num <= 100; // Station number should be between 2 and 100
+            case SEATNUM:
+                return num >= 0 && num <= 100000; // Seat number should be between 1 and 100000
+            case PRICES:
+                return num >= 0 && num <= 100000; // Price should be between 1 and 100000
+            case TRAVELTIMES:
+                return num >= 0 && num <= 10000; // Travel time should be between 1 and 10000 minutes
+            case STOPOVERTIMES:
+                return num >= 0 && num <= 10000; // Stopover time should be between 1 and 10000 minutes
+            default:
+                return num >= 0; // For other types, just check if it's a valid non-negative integer
+        }
+    }
 };
 #endif // VALIDATOR_HPP

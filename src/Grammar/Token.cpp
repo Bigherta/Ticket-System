@@ -1,21 +1,20 @@
-#include "../include/Token.hpp"
-#include <memory>
+#include "../../include/Grammar/Token.hpp"
 
-TokenStream::TokenStream(std::vector<Token> &&tokens) : tokens_(std::move(tokens)), cursor_(0) {}
+TokenStream::TokenStream(sjtu::vector<Token> &&tokens) : tokens_(std::move(tokens)), cursor_(0) {}
 
-const std::shared_ptr<Token> TokenStream::peek() const
+const Token* TokenStream::peek() const
 {
     if (cursor_ >= tokens_.size())
     {
         return nullptr;
     }
-    std::shared_ptr<Token> temp = std::make_shared<Token>(tokens_[cursor_]);
+    const Token* temp = &tokens_[cursor_];
     return temp;
 } // 查看当前token并返回指针
 
-const std::shared_ptr<Token> TokenStream::get()
+const Token* TokenStream::get()
 {
-    const std::shared_ptr<Token> current = peek();
+    const Token* current = peek();
     if (current != nullptr)
     {
         ++cursor_;

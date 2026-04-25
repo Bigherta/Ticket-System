@@ -2,11 +2,13 @@
 #define USER_HPP
 #include <string>
 #include "../BPlusTree/BPT.hpp"
+#include "../Grammar/token.hpp"
 #include "../Library/set.hpp"
 class UserManager;
 class User
 {
     friend class UserManager;
+
 private:
     char username[21]{};
     unsigned long long password{};
@@ -56,7 +58,8 @@ public:
 
     std::string to_string() const
     {
-        return std::string(username) + " " + std::string(name) + " " + std::string(mailAddr) + " " + std::to_string(privilege);
+        return std::string(username) + " " + std::string(name) + " " + std::string(mailAddr) + " " +
+               std::to_string(privilege);
     }
 };
 class UserManager
@@ -73,12 +76,12 @@ public:
      * @param password_ 用户密码
      * @param name_ 用户姓名
      * @param mailAddr_ 用户邮箱地址
-     * @param privilegeLevel_ 用户权限等级，创建第一个用户时忽略该参数
-     * @return true 注册成功
-     * @return false 注册失败（用户ID已存在或参数非法）
+     * @param privilege_str 用户权限等级，创建第一个用户时忽略该参数
+     * @return "0" 注册成功
+     * @return "-1" 注册失败（用户ID已存在或参数非法）
      */
-    int registerUser(const std::string &cur_User, const std::string &username_, const std::string &password_,
-                      const std::string &name_, const std::string &mailAddr_, int privilegeLevel_);
+    std::string registerUser(const std::string &cur_User, const std::string &username_, const std::string &password_,
+                             const std::string &name_, const std::string &mailAddr_, const std::string &privilege_str);
 
     /**
      * @brief 检查指定用户是否已登录
@@ -92,18 +95,18 @@ public:
      * @brief 用户登录操作
      * @param username_ 用户名
      * @param password_ 用户密码
-     * @return true 登录成功
-     * @return false 登录失败（用户不存在或密码错误）
+     * @return "0" 登录成功
+     * @return "-1" 登录失败（用户不存在或密码错误）
      */
-    int login(const std::string &username_, const std::string &password_);
+    std::string login(const std::string &username_, const std::string &password_);
 
     /**
      * @brief 用户登出操作
      * @param username_ 用户名
-     * @return true 登出成功
-     * @return false 当前没有用户登录
+     * @return "0" 登出成功
+     * @return "-1" 当前没有用户登录
      */
-    int logout(const std::string &username_);
+    std::string logout(const std::string &username_);
 
     /**
      * @brief 访问用户信息
@@ -120,12 +123,17 @@ public:
      * @param name_ 新姓名（可选， 传入空字符串表示不修改）
      * @param password_ 新密码（可选， 传入空字符串表示不修改）
      * @param mailAddr_ 新邮箱地址（可选， 传入空字符串表示不修改）
-     * @param privilegeLevel_ 新权限等级（可选， 传入-1表示不修改）
+     * @param privilege_str 新权限等级（可选， 传入空字符串表示不修改）
      * @return 用户信息（若修改失败，则返回-1）
      */
     std::string modifyUser(const std::string &cur_User, const std::string &username_, const std::string &name_,
-                           const std::string &password_, const std::string &mailAddr_, int privilegeLevel_);
-
+                           const std::string &password_, const std::string &mailAddr_, const std::string &privilege_str);
+    /**
+     * @brief 处理用户相关指令
+     * @param tokens 解析后的指令参数列表
+     * @return 执行结果字符串
+     */
+    std::string handleUserCommand(TokenStream &tokens);
     /**
      * @brief 退出系统。
      */
@@ -140,10 +148,8 @@ private:
     struct UserName
     {
         char name[21]{};
-        UserName(const std::string &name_)
-        {
-            std::snprintf(name, sizeof(name), "%s", name_.c_str());
-        }
+        UserName() = default;
+        UserName(const std::string &name_) { std::snprintf(name, sizeof(name), "%s", name_.c_str()); }
         bool operator<(const UserName &other) const { return std::strcmp(name, other.name) < 0; }
         bool operator==(const UserName &other) const { return std::strcmp(name, other.name) == 0; }
         bool operator!=(const UserName &other) const { return !(*this == other); }
