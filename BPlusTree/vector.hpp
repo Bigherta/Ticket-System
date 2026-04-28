@@ -1,6 +1,7 @@
 #ifndef SJTU_VECTOR_HPP
 #define SJTU_VECTOR_HPP
 
+#include <cstddef>
 #include "exceptions.hpp"
 
 namespace sjtu
@@ -40,6 +41,7 @@ namespace sjtu
             // https://blog.csdn.net/u014299153/article/details/72419713 About
             // iterator_category: https://en.cppreference.com/w/cpp/iterator
         public:
+            using difference_type = std::ptrdiff_t;
             using value_type = T;
             using pointer = T *;
             using reference = T &;
@@ -158,6 +160,7 @@ namespace sjtu
         class const_iterator
         {
         public:
+            using difference_type = std::ptrdiff_t;
             using value_type = T;
             using pointer = T *;
             using reference = T &;

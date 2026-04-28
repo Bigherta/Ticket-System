@@ -2,7 +2,7 @@
 #define BPT_MEMORYRIVER_HPP
 
 #include <fstream>
-#include "../Library/vector.hpp"
+#include "vector.hpp"
 
 using std::fstream;
 using std::ifstream;
@@ -153,21 +153,6 @@ public:
 
     // 删除位置索引index对应的对象，保证调用的index都是由write函数产生
     void Delete(int index) { /* your code here */ free_index.push_back(index); }
-    void clear()
-    {
-        if (file.is_open())
-            file.close();
-        if (free_file.is_open())
-            free_file.close();
-        free_index.clear();
-        file.open(file_name, std::ios::out | std::ios::trunc | std::ios::binary);
-        free_file.open(free_block_name(), std::ios::out | std::ios::trunc | std::ios::binary);
-        int tmp = 0;
-        for (int i = 0; i < info_len; ++i)
-            file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
-        file.close();
-        free_file.close();
-    }
 };
 
 

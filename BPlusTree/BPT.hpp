@@ -1,10 +1,10 @@
 #ifndef BPT_HPP
 #define BPT_HPP
-#include "../Library/utility.hpp"
-#include "../Library/vector.hpp"
+#include <iostream>
 #include "BPT_MemoryRiver.hpp"
-constexpr int order =
-        256; // B+ tree order, can be adjusted based on block size and key/value size for better performance
+#include "utility.hpp"
+#include "vector.hpp"
+constexpr int order = 128;
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
@@ -63,7 +63,7 @@ private:
     };
     int root_pos = 2 * sizeof(int); // position of the root node in the file
     int tree_size = 0; // number of nodes in the tree
-    MemoryRiver<Node<order>> BPTree; // B+ tree with order 256
+    MemoryRiver<Node<order>> BPTree; // B+ tree with order 128
     void split(Node<order> &node, int node_pos)
     {
         int left_size = order / 2; // number of keys to keep in the left node
@@ -161,6 +161,7 @@ private:
 
     void fix_parent(int node_pos, sjtu::vector<int> trace_index)
     {
+        // 提前拿到新的最小值，避免在循环中重复读取
         sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
         Node<order> node;
         BPTree.read(node, node_pos);
@@ -463,9 +464,9 @@ private:
     }
 
 public:
-    BPT(const std::string &filename = "BPTree.dat")
+    BPT()
     {
-        BPTree.initialise(filename);
+        BPTree.initialise("BPTree.dat");
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
     }
@@ -553,11 +554,12 @@ public:
         // Node underflow, need to merge with sibling
         merge(node, trace_index, node_pos);
     }
-    bool count(const T &key)
+    void search(const T &key)
     {
         if (tree_size == 0)
         {
-            return false;
+            std::cout << "null\n";
+            return;
         }
         Node<order> node;
         BPTree.read(node, root_pos);
@@ -572,68 +574,44 @@ public:
         {
             if (node.Keys[scan_index].first != key)
             {
-                return false;
+                std::cout << "null\n";
+                return;
             }
         }
         else
         {
             if (node.next == -1)
             {
-                return false;
+                std::cout << "null\n";
+                return;
             }
             BPTree.read(node, node.next);
             scan_index = 0;
             if (node.Keys[scan_index].first != key)
             {
-                return false;
+                std::cout << "null\n";
+                return;
             }
         }
-        return true;
-    }
-
-    int visit(const T &key)
-    {
-        if (tree_size == 0)
+        sjtu::pair<T, int> keyValuePair(key, node.Keys[scan_index].second);
+        while (keyValuePair.first == key)
         {
-            return -1;
-        }
-        Node<order> node;
-        BPTree.read(node, root_pos);
-        int child_index = BinarySearch(node.Keys, node.size, key);
-        while (!node.isLeaf)
-        {
-            BPTree.read(node, node.children[child_index]);
-            child_index = BinarySearch(node.Keys, node.size, key);
-        }
-        int visit_index = child_index;
-        if (visit_index < node.size)
-        {
-            if (node.Keys[visit_index].first != key)
+            std::cout << keyValuePair.second << ' ';
+            if (++scan_index < node.size)
+                keyValuePair = node.Keys[scan_index];
+            else
             {
-                return -1;
+                if (node.next == -1)
+                {
+                    std::cout << '\n';
+                    return;
+                }
+                BPTree.read(node, node.next);
+                scan_index = 0;
+                keyValuePair = node.Keys[scan_index];
             }
         }
-        else
-        {
-            if (node.next == -1)
-            {
-                return -1;
-            }
-            BPTree.read(node, node.next);
-            visit_index = 0;
-            if (node.Keys[visit_index].first != key)
-            {
-                return -1;
-            }
-        }
-        return node.Keys[visit_index].second;
-    }
-    bool empty() const { return tree_size == 0; }
-    void clear()
-    {
-        BPTree.clear();
-        tree_size = 0;
-        root_pos = 2 * sizeof(int);
+        std::cout << '\n';
     }
 };
 #endif // BPT.hpp
