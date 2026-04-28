@@ -2,6 +2,7 @@
 #define BPT_HPP
 #include <iostream>
 #include "BPT_MemoryRiver.hpp"
+#include "BufferPoolManager.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
 constexpr int order = 128;
@@ -63,7 +64,8 @@ private:
     };
     int root_pos = 2 * sizeof(int); // position of the root node in the file
     int tree_size = 0; // number of nodes in the tree
-    MemoryRiver<Node<order>> BPTree; // B+ tree with order 128
+    MemoryRiver<Node<order>> BPTree;
+    BufferPoolManager<Node<order>> *bufferPool;
     void split(Node<order> &node, int node_pos)
     {
         int left_size = order / 2; // number of keys to keep in the left node
@@ -80,7 +82,7 @@ private:
             for (int i = 0; i < right_size; ++i)
                 newNode.Keys[i] = node.Keys[left_size + i];
             newNode.next = node.next;
-            new_node_pos = BPTree.write(newNode);
+            new_node_pos = bufferPool->new_page(newNode);
             ++tree_size;
             node.next = new_node_pos;
         }
@@ -93,21 +95,20 @@ private:
             {
                 newNode.children[i] = node.children[left_size + i + 1];
             }
-            new_node_pos = BPTree.write(newNode);
+            new_node_pos = bufferPool->new_page(newNode);
             ++tree_size;
             for (int i = 0; i < newNode.size + 1; ++i)
             {
-                Node<order> childNode;
-                BPTree.read(childNode, newNode.children[i]);
+                Node<order> childNode = bufferPool->get(newNode.children[i]);
                 childNode.parent = new_node_pos;
-                BPTree.update(childNode, newNode.children[i]);
+                bufferPool->put(newNode.children[i], childNode);
             }
         }
         // Capture middle key before shrinking the left node
         sjtu::pair<T, int> midKey = node.Keys[left_size];
         node.size = left_size;
         // Persist left node now so recursive splits won't be overwritten
-        BPTree.update(node, node_pos);
+        bufferPool->put(node_pos, node);
         if (node.parent == -1) // node is root, need to create new root
         {
             Node<order> newRoot;
@@ -116,18 +117,17 @@ private:
             newRoot.Keys[0] = midKey;
             newRoot.children[0] = node_pos;
             newRoot.children[1] = new_node_pos;
-            root_pos = BPTree.write(newRoot);
+            root_pos = bufferPool->new_page(newRoot);
             ++tree_size;
             node.parent = root_pos;
             newNode.parent = root_pos;
             // write updated parent pointers for the two children
-            BPTree.update(node, node_pos);
-            BPTree.update(newNode, new_node_pos);
+            bufferPool->put(node_pos, node);
+            bufferPool->put(new_node_pos, newNode);
         }
         else
         {
-            Node<order> parentNode;
-            BPTree.read(parentNode, node.parent);
+            Node<order> parentNode = bufferPool->get(node.parent);
             int pos = BinarySearch(parentNode.Keys, parentNode.size, midKey);
             for (int i = parentNode.size; i > pos; --i)
                 parentNode.Keys[i] = parentNode.Keys[i - 1];
@@ -143,18 +143,17 @@ private:
                 split(parentNode, node.parent);
             }
             else
-                BPTree.update(parentNode, node.parent);
+                bufferPool->put(node.parent, parentNode);
         }
     }
 
     sjtu::pair<T, int> subtree_min_key(int node_pos)
     {
-        Node<order> node;
-        BPTree.read(node, node_pos);
+        Node<order> node = bufferPool->get(node_pos);
         while (!node.isLeaf)
         {
             node_pos = node.children[0];
-            BPTree.read(node, node_pos);
+            node = bufferPool->get(node_pos);
         }
         return node.Keys[0];
     }
@@ -163,13 +162,11 @@ private:
     {
         // 提前拿到新的最小值，避免在循环中重复读取
         sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
-        Node<order> node;
-        BPTree.read(node, node_pos);
+        Node<order> node = bufferPool->get(node_pos);
 
         while (node.parent != -1)
         {
-            Node<order> parentNode;
-            BPTree.read(parentNode, node.parent);
+            Node<order> parentNode = bufferPool->get(node.parent);
             int child_index = -1;
 
             if (!trace_index.empty())
@@ -198,7 +195,7 @@ private:
             }
 
             parentNode.Keys[child_index - 1] = new_min;
-            BPTree.update(parentNode, node.parent);
+            bufferPool->put(node.parent, parentNode);
 
             return;
         }
@@ -210,22 +207,20 @@ private:
             if (!node.isLeaf && node.size == 0)
             {
                 root_pos = node.children[0];
-                Node<order> newRoot;
-                BPTree.read(newRoot, root_pos);
+                Node<order> newRoot = bufferPool->get(root_pos);
                 newRoot.parent = -1;
-                BPTree.update(newRoot, root_pos);
-                BPTree.Delete(node_pos);
+                bufferPool->put(root_pos, newRoot);
+                bufferPool->Delete(node_pos);
                 --tree_size;
             }
             else
             {
-                BPTree.update(node, node_pos);
+                bufferPool->put(node_pos, node);
             }
             return;
         }
-        Node<order> parentNode;
+        Node<order> parentNode = bufferPool->get(node.parent);
         int parent_pos = node.parent;
-        BPTree.read(parentNode, parent_pos);
         int index = -1;
         if (!trace_index.empty())
         {
@@ -251,8 +246,7 @@ private:
         {
             if (HasLeftSibling)
             {
-                Node<order> leftSibling;
-                BPTree.read(leftSibling, parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
                 if (leftSibling.size > min_leaf_keys_non_root) // borrow from left sibling
                 {
                     for (int i = node.size; i > 0; --i)
@@ -261,16 +255,15 @@ private:
                     parentNode.Keys[index - 1] = node.Keys[0];
                     --leftSibling.size;
                     ++node.size;
-                    BPTree.update(parentNode, node.parent);
-                    BPTree.update(leftSibling, parentNode.children[index - 1]);
-                    BPTree.update(node, node_pos);
+                    bufferPool->put(node.parent, parentNode);
+                    bufferPool->put(parentNode.children[index - 1],leftSibling );
+                    bufferPool->put(node_pos, node);
                     return;
                 }
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling;
-                BPTree.read(rightSibling, parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
                 if (rightSibling.size > min_leaf_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = rightSibling.Keys[0];
@@ -279,22 +272,21 @@ private:
                     parentNode.Keys[index] = rightSibling.Keys[0];
                     --rightSibling.size;
                     ++node.size;
-                    BPTree.update(parentNode, node.parent);
-                    BPTree.update(rightSibling, parentNode.children[index + 1]);
-                    BPTree.update(node, node_pos);
+                    bufferPool->put(node.parent, parentNode);
+                    bufferPool->put(parentNode.children[index + 1], rightSibling);
+                    bufferPool->put(node_pos, node);
                     return;
                 }
             }
             if (HasLeftSibling)
             {
-                Node<order> leftSibling;
-                BPTree.read(leftSibling, parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
                 for (int i = leftSibling.size; i < leftSibling.size + node.size; ++i)
                     leftSibling.Keys[i] = node.Keys[i - leftSibling.size];
                 leftSibling.size += node.size;
                 leftSibling.next = node.next;
-                BPTree.update(leftSibling, parentNode.children[index - 1]);
-                BPTree.Delete(node_pos);
+                bufferPool->put(parentNode.children[index - 1], leftSibling);
+                bufferPool->Delete(node_pos);
                 tree_size--;
                 for (int i = index; i < parentNode.size; ++i)
                     parentNode.Keys[i - 1] = parentNode.Keys[i];
@@ -307,20 +299,19 @@ private:
                 }
                 else
                 {
-                    BPTree.update(parentNode, parent_pos);
+                    bufferPool->put(parent_pos, parentNode);
                 }
                 return;
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling;
-                BPTree.read(rightSibling, parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
                 for (int i = node.size; i < node.size + rightSibling.size; ++i)
                     node.Keys[i] = rightSibling.Keys[i - node.size];
                 node.size += rightSibling.size;
                 node.next = rightSibling.next;
-                BPTree.update(node, node_pos);
-                BPTree.Delete(parentNode.children[index + 1]);
+                bufferPool->put(node_pos, node);
+                bufferPool->Delete(parentNode.children[index + 1]);
                 tree_size--;
                 for (int i = index + 1; i < parentNode.size; ++i)
                     parentNode.Keys[i - 1] = parentNode.Keys[i];
@@ -333,7 +324,7 @@ private:
                 }
                 else
                 {
-                    BPTree.update(parentNode, parent_pos);
+                    bufferPool->put(parent_pos, parentNode);
                 }
                 return;
             }
@@ -342,8 +333,7 @@ private:
         {
             if (HasLeftSibling)
             {
-                Node<order> leftSibling;
-                BPTree.read(leftSibling, parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
                 if (leftSibling.size > min_internal_keys_non_root) // borrow from left sibling
                 {
                     for (int i = node.size; i > 0; --i)
@@ -352,23 +342,21 @@ private:
                         node.children[i] = node.children[i - 1];
                     node.Keys[0] = parentNode.Keys[index - 1];
                     node.children[0] = leftSibling.children[leftSibling.size];
-                    Node<order> moveNode;
-                    BPTree.read(moveNode, node.children[0]);
+                    Node<order> moveNode = bufferPool->get(node.children[0]);
                     moveNode.parent = node_pos;
-                    BPTree.update(moveNode, node.children[0]);
+                    bufferPool->put(node.children[0], moveNode);
                     parentNode.Keys[index - 1] = leftSibling.Keys[leftSibling.size - 1];
                     --leftSibling.size;
                     ++node.size;
-                    BPTree.update(parentNode, node.parent);
-                    BPTree.update(leftSibling, parentNode.children[index - 1]);
-                    BPTree.update(node, node_pos);
+                    bufferPool->put(node.parent, parentNode);
+                    bufferPool->put(parentNode.children[index - 1], leftSibling);
+                    bufferPool->put(node_pos, node);
                     return;
                 }
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling;
-                BPTree.read(rightSibling, parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
                 if (rightSibling.size > min_internal_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = parentNode.Keys[index];
@@ -378,22 +366,20 @@ private:
                         rightSibling.Keys[i] = rightSibling.Keys[i + 1];
                     for (int i = 0; i < rightSibling.size; ++i)
                         rightSibling.children[i] = rightSibling.children[i + 1];
-                    Node<order> moveNode;
-                    BPTree.read(moveNode, node.children[node.size + 1]);
+                    Node<order> moveNode = bufferPool->get(node.children[node.size + 1]);
                     moveNode.parent = node_pos;
-                    BPTree.update(moveNode, node.children[node.size + 1]);
+                    bufferPool->put(node.children[node.size + 1], moveNode);
                     --rightSibling.size;
                     ++node.size;
-                    BPTree.update(parentNode, node.parent);
-                    BPTree.update(rightSibling, parentNode.children[index + 1]);
-                    BPTree.update(node, node_pos);
+                    bufferPool->put(node.parent, parentNode);
+                    bufferPool->put(parentNode.children[index + 1], rightSibling);
+                    bufferPool->put(node_pos, node);
                     return;
                 }
             }
             if (HasLeftSibling)
             {
-                Node<order> leftSibling;
-                BPTree.read(leftSibling, parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
                 int old_left_size = leftSibling.size;
                 leftSibling.Keys[old_left_size] = parentNode.Keys[index - 1];
                 for (int i = 0; i < node.size; ++i)
@@ -401,14 +387,13 @@ private:
                 for (int i = 0; i <= node.size; ++i)
                 {
                     leftSibling.children[old_left_size + 1 + i] = node.children[i];
-                    Node<order> moveNode;
-                    BPTree.read(moveNode, node.children[i]);
+                    Node<order> moveNode = bufferPool->get(node.children[i]);
                     moveNode.parent = parentNode.children[index - 1];
-                    BPTree.update(moveNode, node.children[i]);
+                    bufferPool->put(node.children[i], moveNode);
                 }
                 leftSibling.size = old_left_size + node.size + 1;
-                BPTree.update(leftSibling, parentNode.children[index - 1]);
-                BPTree.Delete(node_pos);
+                bufferPool->put(parentNode.children[index - 1], leftSibling);
+                bufferPool->Delete(node_pos);
                 tree_size--;
                 for (int i = index; i < parentNode.size; ++i)
                     parentNode.Keys[i - 1] = parentNode.Keys[i];
@@ -421,14 +406,13 @@ private:
                 }
                 else
                 {
-                    BPTree.update(parentNode, parent_pos);
+                    bufferPool->put(parent_pos, parentNode);
                 }
                 return;
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling;
-                BPTree.read(rightSibling, parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
                 int old_node_size = node.size;
                 node.Keys[old_node_size] = parentNode.Keys[index];
                 for (int i = 0; i < rightSibling.size; ++i)
@@ -436,14 +420,13 @@ private:
                 for (int i = 0; i <= rightSibling.size; ++i)
                 {
                     node.children[old_node_size + 1 + i] = rightSibling.children[i];
-                    Node<order> moveNode;
-                    BPTree.read(moveNode, rightSibling.children[i]);
+                    Node<order> moveNode = bufferPool->get(rightSibling.children[i]);
                     moveNode.parent = node_pos;
-                    BPTree.update(moveNode, rightSibling.children[i]);
+                    bufferPool->put(rightSibling.children[i], moveNode);
                 }
                 node.size = old_node_size + rightSibling.size + 1;
-                BPTree.update(node, node_pos);
-                BPTree.Delete(parentNode.children[index + 1]);
+                bufferPool->put(node_pos, node);
+                bufferPool->Delete(parentNode.children[index + 1]);
                 tree_size--;
                 for (int i = index + 1; i < parentNode.size; ++i)
                     parentNode.Keys[i - 1] = parentNode.Keys[i];
@@ -456,7 +439,7 @@ private:
                 }
                 else
                 {
-                    BPTree.update(parentNode, parent_pos);
+                    bufferPool->put(parent_pos, parentNode);
                 }
                 return;
             }
@@ -469,11 +452,14 @@ public:
         BPTree.initialise("BPTree.dat");
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
+
+        bufferPool = new BufferPoolManager<Node<order>>(100, BPTree, root_pos);
     }
     ~BPT()
     {
         BPTree.write_info(root_pos, 1);
         BPTree.write_info(tree_size, 2);
+        delete bufferPool;
     }
     void insert(const T &key, int value)
     {
@@ -486,20 +472,19 @@ public:
             root.Keys[0] = keyValuePair;
             root.parent = -1;
             root.next = -1;
-            root_pos = BPTree.write(root);
+            root_pos = bufferPool->new_page(root);
             tree_size = 1;
         }
         else
         {
-            Node<order> node;
-            BPTree.read(node, root_pos);
+            Node<order> node = bufferPool->get(root_pos);
             int node_pos = root_pos;
             while (!node.isLeaf)
             {
                 // Keep order by (key, value) so duplicated keys with different values are all indexed.
                 int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
                 node_pos = node.children[child_index];
-                BPTree.read(node, node_pos);
+                node = bufferPool->get(node_pos);
             }
             int insert_index = BinarySearch(node.Keys, node.size, keyValuePair);
             for (int i = node.size; i > insert_index; --i)
@@ -509,7 +494,7 @@ public:
             if (node.size > max_keys) // node overflow, need to split
                 split(node, node_pos);
             else
-                BPTree.update(node, node_pos);
+                bufferPool->put(node_pos, node);
         }
     }
     void remove(const T &key, int value)
@@ -519,8 +504,7 @@ public:
             return;
         }
         sjtu::vector<int> trace_index; // index of the child in the parent node
-        Node<order> node;
-        BPTree.read(node, root_pos);
+        Node<order> node = bufferPool->get(root_pos);
         int node_pos = root_pos;
         sjtu::pair<T, int> keyValuePair(key, value);
         while (!node.isLeaf)
@@ -528,7 +512,7 @@ public:
             int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
             trace_index.push_back(child_index);
             node_pos = node.children[child_index];
-            BPTree.read(node, node_pos);
+                node = bufferPool->get(node_pos);
         }
         int upper_index = BinarySearch(node.Keys, node.size, keyValuePair);
         if (upper_index == 0 || node.Keys[upper_index - 1] != keyValuePair)
@@ -540,7 +524,7 @@ public:
         --node.size;
 
         // Persist leaf mutation first so subtree_min_key sees fresh data.
-        BPTree.update(node, node_pos);
+        bufferPool->put(node_pos, node);
 
         // If the deleted key was the first key, subtree minimum may have changed.
         if (upper_index == 1)
@@ -561,12 +545,11 @@ public:
             std::cout << "null\n";
             return;
         }
-        Node<order> node;
-        BPTree.read(node, root_pos);
+        Node<order> node = bufferPool->get(root_pos);
         int child_index = BinarySearch(node.Keys, node.size, key);
         while (!node.isLeaf)
         {
-            BPTree.read(node, node.children[child_index]);
+            node = bufferPool->get(node.children[child_index]);
             child_index = BinarySearch(node.Keys, node.size, key);
         }
         int scan_index = child_index;
@@ -585,7 +568,7 @@ public:
                 std::cout << "null\n";
                 return;
             }
-            BPTree.read(node, node.next);
+            node = bufferPool->get(node.next);
             scan_index = 0;
             if (node.Keys[scan_index].first != key)
             {
@@ -606,7 +589,7 @@ public:
                     std::cout << '\n';
                     return;
                 }
-                BPTree.read(node, node.next);
+                node = bufferPool->get(node.next);
                 scan_index = 0;
                 keyValuePair = node.Keys[scan_index];
             }
