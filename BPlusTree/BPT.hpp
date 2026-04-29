@@ -5,7 +5,7 @@
 #include "BufferPoolManager.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
-constexpr int order = 256;
+constexpr int order = 128; // B+ tree order, can be tuned for performance (must be >= 3)
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
