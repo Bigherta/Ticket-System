@@ -158,7 +158,7 @@ private:
         return node.Keys[0];
     }
 
-    void fix_parent(int node_pos, sjtu::vector<int> trace_index)
+    void fix_parent(int node_pos, sjtu::vector<int>& trace_index)
     {
         // 提前拿到新的最小值，避免在循环中重复读取
         sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
@@ -200,7 +200,7 @@ private:
             return;
         }
     }
-    void merge(Node<order> &node, sjtu::vector<int> &trace_index, int node_pos)
+    void merge(Node<order> &node, sjtu::vector<int>& trace_index, int node_pos)
     {
         if (node.parent == -1)
         {
