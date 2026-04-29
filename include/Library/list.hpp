@@ -2,9 +2,6 @@
 #ifndef SJTU_LIST_HPP
 #define SJTU_LIST_HPP
 
-#include <cstddef>
-#include <new>
-
 namespace sjtu
 {
 
@@ -82,7 +79,7 @@ namespace sjtu
             length--;
         }
         node *head, *tail;
-        size_t length;
+        int length;
 
     public:
         /**
@@ -144,7 +141,7 @@ namespace sjtu
         /* Checks whether the container is empty. */
         bool empty() const noexcept { return length == 0; }
         /* Return count of elements in the container. */
-        size_t size() const noexcept { return length; }
+        int size() const noexcept { return length; }
 
         /* Clear the contents. */
         void clear() noexcept

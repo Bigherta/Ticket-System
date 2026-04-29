@@ -2,7 +2,7 @@
 #define BPT_MEMORYRIVER_HPP
 
 #include <fstream>
-#include "vector.hpp"
+#include "../Library/vector.hpp"
 
 using std::fstream;
 using std::ifstream;

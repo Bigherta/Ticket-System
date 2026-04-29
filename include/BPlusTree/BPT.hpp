@@ -3,8 +3,8 @@
 #include <iostream>
 #include "BPT_MemoryRiver.hpp"
 #include "BufferPoolManager.hpp"
-#include "utility.hpp"
-#include "vector.hpp"
+#include "../Library/utility.hpp"
+#include "../Library/vector.hpp"
 constexpr int order = 128;
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
@@ -20,8 +20,8 @@ int BinarySearch(const T arr[], int size, const T &key) // upper_bound
     }
     return left;
 }
-template<class T>
-int BinarySearch(const sjtu::pair<T, int> arr[], int size, const T &key) // lower_bound
+template<class Key, class Value>
+int BinarySearch(const sjtu::pair<Key, Value> arr[], int size, const Key &key) // lower_bound
 {
     int left = 0, right = size;
     while (left < right)
@@ -34,7 +34,7 @@ int BinarySearch(const sjtu::pair<T, int> arr[], int size, const T &key) // lowe
     }
     return left;
 }
-template<class T>
+template<class Key, class Value>
 class BPT
 {
 private:
@@ -50,7 +50,7 @@ private:
     {
         bool isLeaf; // true for leaf, false for internal
         int size; // number of keys currently in the node
-        sjtu::pair<T, int> Keys[M]; // keys and values in the node
+        sjtu::pair<Key, Value> Keys[M]; // keys and values in the node
         int parent; // index of the parent node
         int children[M + 1]; // index, internal only
         int next; // leaf only, index of the next leaf node
@@ -105,7 +105,7 @@ private:
             }
         }
         // Capture middle key before shrinking the left node
-        sjtu::pair<T, int> midKey = node.Keys[left_size];
+        sjtu::pair<Key, Value> midKey = node.Keys[left_size];
         node.size = left_size;
         // Persist left node now so recursive splits won't be overwritten
         bufferPool->put(node_pos, node);
@@ -147,7 +147,7 @@ private:
         }
     }
 
-    sjtu::pair<T, int> subtree_min_key(int node_pos)
+    sjtu::pair<Key, Value> subtree_min_key(int node_pos)
     {
         Node<order> node = bufferPool->get(node_pos);
         while (!node.isLeaf)
@@ -158,10 +158,10 @@ private:
         return node.Keys[0];
     }
 
-    void fix_parent(int node_pos, sjtu::vector<int> trace_index)
+    void fix_parent(int node_pos, sjtu::vector<int>& trace_index)
     {
         // 提前拿到新的最小值，避免在循环中重复读取
-        sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
+        sjtu::pair<Key, Value> new_min = subtree_min_key(node_pos);
         Node<order> node = bufferPool->get(node_pos);
 
         while (node.parent != -1)
@@ -200,7 +200,7 @@ private:
             return;
         }
     }
-    void merge(Node<order> &node, sjtu::vector<int> &trace_index, int node_pos)
+    void merge(Node<order> &node, sjtu::vector<int>& trace_index, int node_pos)
     {
         if (node.parent == -1)
         {
@@ -453,7 +453,7 @@ public:
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
 
-        bufferPool = new BufferPoolManager<Node<order>>(2000, BPTree, root_pos);
+        bufferPool = new BufferPoolManager<Node<order>>(2500, BPTree, root_pos);
     }
     ~BPT()
     {
@@ -461,9 +461,9 @@ public:
         BPTree.write_info(tree_size, 2);
         delete bufferPool;
     }
-    void insert(const T &key, int value)
+    void insert(const Key &key, const Value &value)
     {
-        sjtu::pair<T, int> keyValuePair(key, value);
+        sjtu::pair<Key, Value> keyValuePair(key, value);
         if (tree_size == 0) // tree is empty, create root node
         {
             Node<order> root;
@@ -497,7 +497,7 @@ public:
                 bufferPool->put(node_pos, node);
         }
     }
-    void remove(const T &key, int value)
+    void remove(const Key &key, const Value &value)
     {
         if (tree_size == 0)
         {
@@ -506,7 +506,7 @@ public:
         sjtu::vector<int> trace_index; // index of the child in the parent node
         Node<order> node = bufferPool->get(root_pos);
         int node_pos = root_pos;
-        sjtu::pair<T, int> keyValuePair(key, value);
+        sjtu::pair<Key, Value> keyValuePair(key, value);
         while (!node.isLeaf)
         {
             int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
@@ -538,7 +538,7 @@ public:
         // Node underflow, need to merge with sibling
         merge(node, trace_index, node_pos);
     }
-    void search(const T &key)
+    void search(const Key &key)
     {
         if (tree_size == 0)
         {
@@ -576,7 +576,7 @@ public:
                 return;
             }
         }
-        sjtu::pair<T, int> keyValuePair(key, node.Keys[scan_index].second);
+        sjtu::pair<Key, Value> keyValuePair(key, node.Keys[scan_index].second);
         while (keyValuePair.first == key)
         {
             std::cout << keyValuePair.second << ' ';

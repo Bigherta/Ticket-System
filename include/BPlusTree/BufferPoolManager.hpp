@@ -1,8 +1,8 @@
 #ifndef BUFFERPOOLMANAGER_HPP
 #define BUFFERPOOLMANAGER_HPP
 #include "BPT_MemoryRiver.hpp"
-#include "list.hpp"
-#include "unordered_map.hpp"
+#include "../Library/list.hpp"
+#include "../Library/unordered_map.hpp"
 template<class Page>
 class BufferPoolManager
 {
