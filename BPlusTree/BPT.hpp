@@ -5,7 +5,7 @@
 #include "BufferPoolManager.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
-constexpr int order = 128;
+constexpr int order = 256;
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
@@ -158,10 +158,8 @@ private:
         return node.Keys[0];
     }
 
-    void fix_parent(int node_pos, sjtu::vector<int>& trace_index)
+    void fix_parent(int node_pos, const sjtu::pair<T, int>& new_min, sjtu::vector<int>& trace_index)
     {
-        // 提前拿到新的最小值，避免在循环中重复读取
-        sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
         Node<order> node = bufferPool->get(node_pos);
 
         while (node.parent != -1)
@@ -514,12 +512,12 @@ public:
             node_pos = node.children[child_index];
                 node = bufferPool->get(node_pos);
         }
-        int upper_index = BinarySearch(node.Keys, node.size, keyValuePair);
-        if (upper_index == 0 || node.Keys[upper_index - 1] != keyValuePair)
+        int lower_bound_index = BinarySearch(node.Keys, node.size, keyValuePair);
+        if (lower_bound_index == 0 || node.Keys[lower_bound_index - 1] != keyValuePair)
         {
             return;
         }
-        for (int i = upper_index; i < node.size; ++i)
+        for (int i = lower_bound_index; i < node.size; ++i)
             node.Keys[i - 1] = node.Keys[i];
         --node.size;
 
@@ -527,8 +525,8 @@ public:
         bufferPool->put(node_pos, node);
 
         // If the deleted key was the first key, subtree minimum may have changed.
-        if (upper_index == 1)
-            fix_parent(node_pos, trace_index);
+        if (lower_bound_index == 1)
+            fix_parent(node_pos,node.Keys[0], trace_index);
 
         int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
