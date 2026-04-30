@@ -147,7 +147,7 @@ private:
         }
     }
 
-    void fix_parent(int node_pos, const sjtu::pair<T, int>& new_min, sjtu::vector<int> &trace_index)
+    void fix_parent(int node_pos, const sjtu::pair<T, int> &new_min, sjtu::vector<int> &trace_index)
     {
         Node<order> node = bufferPool->get(node_pos);
 
@@ -525,6 +525,35 @@ public:
         // Node underflow, need to merge with sibling
         merge(node, trace_index, node_pos);
     }
+    inline char *fast_itoa(int val, char *buf)
+    {
+        if (val == 0)
+        {
+            *buf++ = '0';
+            return buf;
+        }
+        // 处理负数（如果 int 范围内包含负数）
+        if (val < 0)
+        {
+            *buf++ = '-';
+            val = -val;
+        }
+
+        char temp[12]; // int 最大 10 位 + 符号
+        int i = 0;
+        while (val > 0)
+        {
+            temp[i++] = (val % 10) + '0';
+            val /= 10;
+        }
+        // 反向写入 buffer
+        while (i > 0)
+        {
+            *buf++ = temp[--i];
+        }
+        return buf;
+    }
+
     void search(const T &key)
     {
         if (tree_size == 0)
@@ -532,6 +561,7 @@ public:
             std::cout << "null\n";
             return;
         }
+
         Node<order> node = bufferPool->get(root_pos);
         int child_index = BinarySearch(node.Keys, node.size, key);
         while (!node.isLeaf)
@@ -539,16 +569,9 @@ public:
             node = bufferPool->get(node.children[child_index]);
             child_index = BinarySearch(node.Keys, node.size, key);
         }
+
         int scan_index = child_index;
-        if (scan_index < node.size)
-        {
-            if (node.Keys[scan_index].first != key)
-            {
-                std::cout << "null\n";
-                return;
-            }
-        }
-        else
+        if (scan_index >= node.size)
         {
             if (node.next == -1)
             {
@@ -557,46 +580,54 @@ public:
             }
             node = bufferPool->get(node.next);
             scan_index = 0;
-            if (node.Keys[scan_index].first != key)
-            {
-                std::cout << "null\n";
-                return;
-            }
         }
-        sjtu::vector<int> results;
-        sjtu::pair<T, int> keyValuePair(key, node.Keys[scan_index].second);
-        while (keyValuePair.first == key)
+
+        if (node.Keys[scan_index].first != key)
         {
-            results.push_back(keyValuePair.second);
-            if (++scan_index < node.size)
-                keyValuePair = node.Keys[scan_index];
-            else
+            std::cout << "null\n";
+            return;
+        }
+
+        static char out_buf[131072];
+        char *ptr = out_buf;
+        const char *const buf_end = out_buf + 131000; 
+        bool found_any = false;
+
+        // 模拟 keyValuePair 比较
+        while (node.Keys[scan_index].first == key)
+        {
+            found_any = true;
+
+            // 如果缓冲区接近溢出，先刷新到 stdout
+            if (ptr >= buf_end)
+            {
+                std::cout.write(out_buf, ptr - out_buf);
+                ptr = out_buf;
+            }
+
+            // 直接将整数格式化进缓冲区，不产生任何临时 string 对象
+            ptr = fast_itoa(node.Keys[scan_index].second, ptr);
+            *ptr++ = ' ';
+
+            // 迭代到下一个 Key
+            if (++scan_index >= node.size)
             {
                 if (node.next == -1)
-                {
-                    std::string output;
-                    output.reserve(results.size() * 11); // int 最大 10 位 + 1 空格
-                    for (const int &result: results)
-                    {
-                        output.append(std::to_string(result));
-                        output.push_back(' ');
-                    }
-                    std::cout << output << '\n';
-                    return;
-                }
+                    break;
                 node = bufferPool->get(node.next);
                 scan_index = 0;
-                keyValuePair = node.Keys[scan_index];
             }
         }
-        std::string output;
-        output.reserve(results.size() * 11); // int 最大 10 位 + 1 空格
-        for (const int &result: results)
+
+        if (!found_any)
         {
-            output.append(std::to_string(result));
-            output.push_back(' ');
+            std::cout << "null\n";
         }
-        std::cout << output << '\n';
+        else
+        {
+            *ptr++ = '\n';
+            std::cout.write(out_buf, ptr - out_buf);
+        }
     }
 };
 #endif // BPT.hpp
