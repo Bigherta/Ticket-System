@@ -5,7 +5,7 @@
 #include "BufferPoolManager.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
-constexpr int order = 56;
+constexpr int order = 48;
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
@@ -453,7 +453,7 @@ public:
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
 
-        bufferPool = new BufferPoolManager<Node<order>>(2500, BPTree, root_pos);
+        bufferPool = new BufferPoolManager<Node<order>>(5000, BPTree, root_pos);
     }
     ~BPT()
     {
