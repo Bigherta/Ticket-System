@@ -518,6 +518,26 @@ namespace sjtu
                 throw container_is_empty();
             erase(end() - 1);
         }
+
+        void reserve(size_t n)
+        {
+            if (n <= capacity)
+                return;
+
+            T *new_data = new T[n];
+
+            // copy old data to new memory
+            for (size_t i = 0; i < length; ++i)
+            {
+                new_data[i] = data[i];
+            }
+
+            // release old memory
+            delete[] data;
+
+            data = new_data;
+            capacity = n;
+        }
     };
 
 } // namespace sjtu

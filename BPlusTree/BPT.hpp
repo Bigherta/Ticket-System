@@ -256,7 +256,7 @@ private:
                     --leftSibling.size;
                     ++node.size;
                     bufferPool->put(node.parent, parentNode);
-                    bufferPool->put(parentNode.children[index - 1],leftSibling );
+                    bufferPool->put(parentNode.children[index - 1], leftSibling);
                     bufferPool->put(node_pos, node);
                     return;
                 }
@@ -512,7 +512,7 @@ public:
             int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
             trace_index.push_back(child_index);
             node_pos = node.children[child_index];
-                node = bufferPool->get(node_pos);
+            node = bufferPool->get(node_pos);
         }
         int upper_index = BinarySearch(node.Keys, node.size, keyValuePair);
         if (upper_index == 0 || node.Keys[upper_index - 1] != keyValuePair)
@@ -540,7 +540,6 @@ public:
     }
     void search(const T &key)
     {
-        std::string output;
         if (tree_size == 0)
         {
             std::cout << "null\n";
@@ -577,16 +576,24 @@ public:
                 return;
             }
         }
+        sjtu::vector<int> results;
         sjtu::pair<T, int> keyValuePair(key, node.Keys[scan_index].second);
         while (keyValuePair.first == key)
         {
-            output += std::to_string(keyValuePair.second) + ' ';
+            results.push_back(keyValuePair.second);
             if (++scan_index < node.size)
                 keyValuePair = node.Keys[scan_index];
             else
             {
                 if (node.next == -1)
                 {
+                    std::string output;
+                    output.reserve(results.size() * 11); // int 最大 10 位 + 1 空格
+                    for (const int &result: results)
+                    {
+                        output.append(std::to_string(result));
+                        output.push_back(' ');
+                    }
                     std::cout << output << '\n';
                     return;
                 }
@@ -594,6 +601,13 @@ public:
                 scan_index = 0;
                 keyValuePair = node.Keys[scan_index];
             }
+        }
+        std::string output;
+        output.reserve(results.size() * 11); // int 最大 10 位 + 1 空格
+        for (const int &result: results)
+        {
+            output.append(std::to_string(result));
+            output.push_back(' ');
         }
         std::cout << output << '\n';
     }
