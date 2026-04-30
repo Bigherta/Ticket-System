@@ -147,21 +147,8 @@ private:
         }
     }
 
-    sjtu::pair<T, int> subtree_min_key(int node_pos)
+    void fix_parent(int node_pos, const sjtu::pair<T, int>& new_min, sjtu::vector<int> &trace_index)
     {
-        Node<order> node = bufferPool->get(node_pos);
-        while (!node.isLeaf)
-        {
-            node_pos = node.children[0];
-            node = bufferPool->get(node_pos);
-        }
-        return node.Keys[0];
-    }
-
-    void fix_parent(int node_pos, sjtu::vector<int> &trace_index)
-    {
-        // 提前拿到新的最小值，避免在循环中重复读取
-        sjtu::pair<T, int> new_min = subtree_min_key(node_pos);
         Node<order> node = bufferPool->get(node_pos);
 
         while (node.parent != -1)
@@ -528,7 +515,7 @@ public:
 
         // If the deleted key was the first key, subtree minimum may have changed.
         if (upper_index == 1)
-            fix_parent(node_pos, trace_index);
+            fix_parent(node_pos, node.Keys[0], trace_index);
 
         int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
