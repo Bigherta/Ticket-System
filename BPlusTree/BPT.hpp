@@ -99,7 +99,7 @@ private:
             ++tree_size;
             for (int i = 0; i < newNode.size + 1; ++i)
             {
-                Node<order> childNode = bufferPool->get(newNode.children[i]);
+                Node<order> &childNode = bufferPool->get(newNode.children[i]);
                 childNode.parent = new_node_pos;
                 bufferPool->put(newNode.children[i], childNode);
             }
