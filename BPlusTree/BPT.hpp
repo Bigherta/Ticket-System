@@ -5,7 +5,7 @@
 #include "BufferPoolManager.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
-constexpr int order = 192;
+constexpr int order = 56;
 template<class T>
 int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
