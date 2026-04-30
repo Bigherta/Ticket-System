@@ -7,7 +7,7 @@
 #include "vector.hpp"
 constexpr int order = 48;
 template<class T>
-int BinarySearch(const T arr[], int size, const T &key) // upper_bound
+inline int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
     int left = 0, right = size;
     while (left < right)
@@ -21,7 +21,7 @@ int BinarySearch(const T arr[], int size, const T &key) // upper_bound
     return left;
 }
 template<class T>
-int BinarySearch(const sjtu::pair<T, int> arr[], int size, const T &key) // lower_bound
+inline int BinarySearch(const sjtu::pair<T, int> arr[], int size, const T &key) // lower_bound
 {
     int left = 0, right = size;
     while (left < right)

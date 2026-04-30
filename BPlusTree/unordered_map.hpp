@@ -2,6 +2,7 @@
 #define SJTU_UNORDERED_MAP_HPP
 
 #include <string>
+#include <cstring>
 #include "vector.hpp"
 #include "utility.hpp"
 
@@ -10,30 +11,72 @@ namespace sjtu
 
     namespace detail
     {
-        static inline size_t hash_string(const std::string &str)
+        static constexpr unsigned long long FNV_OFFSET = 1469598103934665603ULL;
+        static constexpr unsigned long long FNV_PRIME = 1099511628211ULL;
+
+        static inline size_t HashBytes(const unsigned char *data, size_t n)
         {
-            unsigned long long h = 1469598103934665603ULL;
-            for (size_t i = 0; i < str.size(); ++i)
+            unsigned long long h = FNV_OFFSET;
+            size_t i = 0;
+            // process 8-byte blocks (use memcpy for safe unaligned access)
+            for (; i + 8 <= n; i += 8)
             {
-                h ^= (unsigned long long)(unsigned char)str[i];
-                h *= 1099511628211ULL;
+                unsigned long long chunk;
+                memcpy(&chunk, data + i, 8);
+                h ^= chunk;
+                h *= FNV_PRIME;
+            }
+            // tail
+            for (; i < n; ++i)
+            {
+                h ^= data[i];
+                h *= FNV_PRIME;
             }
             return static_cast<size_t>(h);
         }
 
+        static inline size_t hash_string(const std::string &s)
+        {
+            const size_t n = s.size();
+            if (n == 0) return static_cast<size_t>(FNV_OFFSET);
+            const unsigned char *data = reinterpret_cast<const unsigned char *>(s.data());
+
+            // fast path: process 8-byte chunks using unsigned long long pointer for throughput
+            unsigned long long h = FNV_OFFSET;
+            size_t blocks = n / 8;
+            const unsigned long long *p = reinterpret_cast<const unsigned long long *>(data);
+            for (size_t i = 0; i < blocks; ++i)
+            {
+                h ^= p[i];
+                h *= FNV_PRIME;
+            }
+            // tail bytes
+            size_t offset = blocks * 8;
+            for (size_t i = offset; i < n; ++i)
+            {
+                h ^= data[i];
+                h *= FNV_PRIME;
+            }
+            return static_cast<size_t>(h);
+        }
+
+        // generic byte-hash fallback for arbitrary types
         template<typename T>
         struct HashKey
         {
             static inline size_t eval(const T &key)
             {
-                const unsigned char *data = reinterpret_cast<const unsigned char *>(&key);
-                unsigned long long h = 1469598103934665603ULL;
-                for (size_t i = 0; i < sizeof(T); ++i)
-                {
-                    h ^= (unsigned long long)data[i];
-                    h *= 1099511628211ULL;
-                }
-                return static_cast<size_t>(h);
+                return HashBytes(reinterpret_cast<const unsigned char *>(&key), sizeof(T));
+            }
+        };
+
+        // int specialization: Knuth multiplicative hash (fast)
+        template<>
+        struct HashKey<int>
+        {
+            static inline size_t eval(int x)
+            {
+                return static_cast<size_t>(static_cast<unsigned long long>(x) * 11995408973635179863ULL);
             }
         };
 
