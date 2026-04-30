@@ -540,6 +540,7 @@ public:
     }
     void search(const T &key)
     {
+        std::string output;
         if (tree_size == 0)
         {
             std::cout << "null\n";
@@ -579,14 +580,14 @@ public:
         sjtu::pair<T, int> keyValuePair(key, node.Keys[scan_index].second);
         while (keyValuePair.first == key)
         {
-            std::cout << keyValuePair.second << ' ';
+            output += std::to_string(keyValuePair.second) + ' ';
             if (++scan_index < node.size)
                 keyValuePair = node.Keys[scan_index];
             else
             {
                 if (node.next == -1)
                 {
-                    std::cout << '\n';
+                    std::cout << output << '\n';
                     return;
                 }
                 node = bufferPool->get(node.next);
@@ -594,7 +595,7 @@ public:
                 keyValuePair = node.Keys[scan_index];
             }
         }
-        std::cout << '\n';
+        std::cout << output << '\n';
     }
 };
 #endif // BPT.hpp
