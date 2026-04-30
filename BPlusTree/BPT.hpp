@@ -127,7 +127,7 @@ private:
         }
         else
         {
-            Node<order> parentNode = bufferPool->get(node.parent);
+            Node<order> &parentNode = bufferPool->get(node.parent);
             int pos = BinarySearch(parentNode.Keys, parentNode.size, midKey);
             for (int i = parentNode.size; i > pos; --i)
                 parentNode.Keys[i] = parentNode.Keys[i - 1];
