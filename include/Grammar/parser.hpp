@@ -5,6 +5,7 @@
 #include <string>
 #include "../Library/unordered_map.hpp"
 #include "../User/user.hpp"
+#include "../Train/train.hpp"
 #include "Token.hpp"
 
 
@@ -12,14 +13,16 @@ enum class ParserState
 {
     COMMAND,
     USER,
-    TRAIN
+    TRAINCMD,
+    TICKETCMD,
 };
 class Parser
 {
 public:
     static sjtu::unordered_map<std::string, TokenType> CMDTABLE;
     static sjtu::unordered_map<std::string, TokenType> USERTABLE;
-    static sjtu::unordered_map<std::string, TokenType> TRAINTABLE;
+    static sjtu::unordered_map<std::string, TokenType> TRAINCOMMANDTABLE;
+    static sjtu::unordered_map<std::string, TokenType> TICKETCOMMANDTABLE;
     inline static ParserState State(TokenType type)
     {
         switch (type)
@@ -33,13 +36,14 @@ public:
             case ADDTRAIN:
             case DELETETRAIN:
             case RELEASETRAIN:
+                return ParserState::TRAINCMD;
             case QUERYTRAIN:
             case QUERYTICKET:
             case QUERYTRANSFER:
             case REFUNDTICKET:
             case QUERYORDER:
             case BUYTICKET:
-                return ParserState::TRAIN;
+                return ParserState::TICKETCMD;
             default:
                 return ParserState::COMMAND; // 默认返回 COMMAND 状态
         }
@@ -68,6 +72,6 @@ public:
      * @param is_running 程序运行状态标志
      * @return 执行结果字符串（如有需要），否则返回空字符串
      */
-    std::string execute(const std::string &, UserManager &, bool &is_running);
+    std::string execute(const std::string &, UserManager &, TrainManager &, bool &is_running);
 };
 #endif

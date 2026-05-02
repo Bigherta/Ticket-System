@@ -1,13 +1,12 @@
 #ifndef BPT_HPP
 #define BPT_HPP
-#include <iostream>
-#include "BPT_MemoryRiver.hpp"
-#include "BufferPoolManager.hpp"
 #include "../Library/utility.hpp"
 #include "../Library/vector.hpp"
+#include "BPT_MemoryRiver.hpp"
+#include "BufferPoolManager.hpp"
 constexpr int order = 48;
 template<class T>
-int BinarySearch(const T arr[], int size, const T &key) // upper_bound
+inline int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
     int left = 0, right = size;
     while (left < right)
@@ -21,7 +20,7 @@ int BinarySearch(const T arr[], int size, const T &key) // upper_bound
     return left;
 }
 template<class Key, class Value>
-int BinarySearch(const sjtu::pair<Key, Value> arr[], int size, const Key &key) // lower_bound
+inline int BinarySearch(const sjtu::pair<Key, Value> arr[], int size, const Key &key) // lower_bound
 {
     int left = 0, right = size;
     while (left < right)
@@ -99,7 +98,7 @@ private:
             ++tree_size;
             for (int i = 0; i < newNode.size + 1; ++i)
             {
-                Node<order> childNode = bufferPool->get(newNode.children[i]);
+                Node<order> &childNode = bufferPool->get(newNode.children[i]);
                 childNode.parent = new_node_pos;
                 bufferPool->put(newNode.children[i], childNode);
             }
@@ -127,7 +126,7 @@ private:
         }
         else
         {
-            Node<order> parentNode = bufferPool->get(node.parent);
+            Node<order> &parentNode = bufferPool->get(node.parent);
             int pos = BinarySearch(parentNode.Keys, parentNode.size, midKey);
             for (int i = parentNode.size; i > pos; --i)
                 parentNode.Keys[i] = parentNode.Keys[i - 1];
@@ -147,21 +146,8 @@ private:
         }
     }
 
-    sjtu::pair<Key, Value> subtree_min_key(int node_pos)
+    void fix_parent(int node_pos, const sjtu::pair<Key, Value> &new_min, sjtu::vector<int> &trace_index)
     {
-        Node<order> node = bufferPool->get(node_pos);
-        while (!node.isLeaf)
-        {
-            node_pos = node.children[0];
-            node = bufferPool->get(node_pos);
-        }
-        return node.Keys[0];
-    }
-
-    void fix_parent(int node_pos, sjtu::vector<int>& trace_index)
-    {
-        // 提前拿到新的最小值，避免在循环中重复读取
-        sjtu::pair<Key, Value> new_min = subtree_min_key(node_pos);
         Node<order> node = bufferPool->get(node_pos);
 
         while (node.parent != -1)
@@ -200,7 +186,7 @@ private:
             return;
         }
     }
-    void merge(Node<order> &node, sjtu::vector<int>& trace_index, int node_pos)
+    void merge(Node<order> &node, sjtu::vector<int> &trace_index, int node_pos)
     {
         if (node.parent == -1)
         {
@@ -256,7 +242,7 @@ private:
                     --leftSibling.size;
                     ++node.size;
                     bufferPool->put(node.parent, parentNode);
-                    bufferPool->put(parentNode.children[index - 1],leftSibling );
+                    bufferPool->put(parentNode.children[index - 1], leftSibling);
                     bufferPool->put(node_pos, node);
                     return;
                 }
@@ -447,13 +433,13 @@ private:
     }
 
 public:
-    BPT()
+    BPT(const std::string &filename = "BPTree.dat")
     {
-        BPTree.initialise("BPTree.dat");
+        BPTree.initialise(filename);
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
 
-        bufferPool = new BufferPoolManager<Node<order>>(5000, BPTree, root_pos);
+        bufferPool = new BufferPoolManager<Node<order>>(1000, BPTree, root_pos);
     }
     ~BPT()
     {
@@ -512,7 +498,7 @@ public:
             int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
             trace_index.push_back(child_index);
             node_pos = node.children[child_index];
-                node = bufferPool->get(node_pos);
+            node = bufferPool->get(node_pos);
         }
         int upper_index = BinarySearch(node.Keys, node.size, keyValuePair);
         if (upper_index == 0 || node.Keys[upper_index - 1] != keyValuePair)
@@ -528,7 +514,7 @@ public:
 
         // If the deleted key was the first key, subtree minimum may have changed.
         if (upper_index == 1)
-            fix_parent(node_pos, trace_index);
+            fix_parent(node_pos, node.Keys[0], trace_index);
 
         int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
         if (node.size >= min_size || node.parent == -1) // node has enough keys or is root, no need to merge
@@ -538,12 +524,12 @@ public:
         // Node underflow, need to merge with sibling
         merge(node, trace_index, node_pos);
     }
-    void search(const Key &key)
+    sjtu::vector<Value> visit(const Key &key)
     {
+        sjtu::vector<Value> result;
         if (tree_size == 0)
         {
-            std::cout << "null\n";
-            return;
+            return result;
         }
         Node<order> node = bufferPool->get(root_pos);
         int child_index = BinarySearch(node.Keys, node.size, key);
@@ -557,44 +543,83 @@ public:
         {
             if (node.Keys[scan_index].first != key)
             {
-                std::cout << "null\n";
-                return;
+                return result;
             }
         }
         else
         {
             if (node.next == -1)
             {
-                std::cout << "null\n";
-                return;
+                return result;
             }
             node = bufferPool->get(node.next);
             scan_index = 0;
             if (node.Keys[scan_index].first != key)
             {
-                std::cout << "null\n";
-                return;
+                return result;
             }
         }
         sjtu::pair<Key, Value> keyValuePair(key, node.Keys[scan_index].second);
         while (keyValuePair.first == key)
         {
-            std::cout << keyValuePair.second << ' ';
+            result.push_back(keyValuePair.second);
             if (++scan_index < node.size)
                 keyValuePair = node.Keys[scan_index];
             else
             {
                 if (node.next == -1)
                 {
-                    std::cout << '\n';
-                    return;
+                    return result;
                 }
                 node = bufferPool->get(node.next);
                 scan_index = 0;
                 keyValuePair = node.Keys[scan_index];
             }
         }
-        std::cout << '\n';
+        return result;
+    }
+    bool find(const Key &key)
+    {
+        if (tree_size == 0)
+        {
+            return false;
+        }
+        Node<order> node = bufferPool->get(root_pos);
+        int child_index = BinarySearch(node.Keys, node.size, key);
+        while (!node.isLeaf)
+        {
+            node = bufferPool->get(node.children[child_index]);
+            child_index = BinarySearch(node.Keys, node.size, key);
+        }
+        int scan_index = child_index;
+        if (scan_index < node.size)
+        {
+            if (node.Keys[scan_index].first != key)
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if (node.next == -1)
+            {
+                return false;
+            }
+            node = bufferPool->get(node.next);
+            scan_index = 0;
+            if (node.Keys[scan_index].first != key)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+    inline bool empty() const { return tree_size == 0; }
+    void clear()
+    {
+        BPTree.clear();
+        tree_size = 0;
+        root_pos = 2 * sizeof(int);
     }
 };
 #endif // BPT.hpp

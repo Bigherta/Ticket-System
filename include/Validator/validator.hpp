@@ -2,6 +2,7 @@
 #define VALIDATOR_HPP
 #include <string>
 #include "../Grammar/Token.hpp"
+#include "../Train/time.hpp"
 class Validator
 {
 public:
@@ -173,6 +174,84 @@ public:
             default:
                 return num >= 0; // For other types, just check if it's a valid non-negative integer
         }
+    }
+
+    /**
+     * @brief 检查列车ID是否合法
+     * @param trainID 列车ID字符串，由char范围内字符组成，长度不超过20
+     * @return true 如果列车ID合法
+     */
+    static bool validate_trainid(const std::string &trainID)
+    {
+        if (trainID.empty() || trainID.size() > 20)
+            return false;
+        return true;
+    }
+
+    /**
+     * @brief 检查单个站点名称是否合法
+     * @param station 站点名称，由汉字组成，不超过10个汉字
+     * @return true 如果站点名称合法
+     */
+    static bool validate_station(const std::string &station)
+    {
+        int count = chinese_count(station);
+        return count >= 1 && count <= 10;
+    }
+
+    /**
+     * @brief 检查列车类型是否合法
+     * @param type 列车类型，一个大写字母
+     * @return true 如果列车类型合法
+     */
+    static bool validate_type(const std::string &type)
+    {
+        return type.size() == 1 && std::isupper(static_cast<unsigned char>(type[0]));
+    }
+
+    static bool validate_time(const std::string &time, Time & start_time)
+    {
+        if (time.size() != 5 || time[2] != ':')
+            return false;
+        std::string hour_str = time.substr(0, 2);
+        std::string minute_str = time.substr(3, 2);
+        for (char c: hour_str)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(c)))
+                return false;
+        }
+        for (char c: minute_str)
+        {
+            if (!std::isdigit(static_cast<unsigned char>(c)))
+                return false;
+        }
+        int hour = std::stoi(hour_str);
+        int minute = std::stoi(minute_str);
+        if (hour < 0 || hour > 23 || minute < 0 || minute > 59)
+            return false;
+        start_time.hour = hour;
+        start_time.minute = minute;
+        return true;
+    }
+
+    static bool validate_saledate(const std::string & sale_date, Date & start_date, Date & end_date)
+    {
+        if (sale_date.size() != 11 || sale_date[5] != '|' || sale_date[2] != '-' || sale_date[8] != '-')
+            return false;
+        std::string start_date_str = sale_date.substr(0, 5);
+        std::string end_date_str = sale_date.substr(6, 5);
+        try
+        {
+            start_date = Date(start_date_str);
+            end_date = Date(end_date_str);
+        }
+        catch (...)
+        {
+            return false;
+        }
+        if (end_date < start_date)
+            return false;
+        return true;
     }
 };
 #endif // VALIDATOR_HPP

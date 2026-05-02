@@ -16,6 +16,20 @@ TokenType Parser::matchkeyword(ParserState state, const std::string &text) const
             return it->second;
         return BLANK;
     }
+    if (state == ParserState::TRAINCMD)
+    {
+        auto it = TRAINCOMMANDTABLE.find(text);
+        if (it != TRAINCOMMANDTABLE.end())
+            return it->second;
+        return BLANK;
+    }
+    if (state == ParserState::TICKETCMD)
+    {
+        auto it = TICKETCOMMANDTABLE.find(text);
+        if (it != TICKETCOMMANDTABLE.end())
+            return it->second;
+        return BLANK;
+    }
     return BLANK;
 }
 
@@ -30,6 +44,7 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw) c
         if (pos != std::string::npos)
         {
             result = line.substr(0, pos + 1); // 提取时间戳
+            result += " "; // 格式化处理时间戳
             line = line.substr(pos + 1);
         }
     }
@@ -48,7 +63,7 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw) c
     std::string word = line.substr(start, i - start);
     TokenType type = matchkeyword(ParserState::COMMAND, word);
     tokens.push_back(Token{type, word});
-    
+
     // determine parsing state based on the command token
     ParserState state = State(type);
 
@@ -82,7 +97,7 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw) c
 }
 
 // 执行指令的主函数
-std::string Parser::execute(const std::string &line_raw, UserManager &userManager, bool &is_running)
+std::string Parser::execute(const std::string &line_raw, UserManager &userManager, TrainManager &trainManager, bool &is_running)
 {
     std::string line = line_raw;
     std::string result;
@@ -106,16 +121,24 @@ std::string Parser::execute(const std::string &line_raw, UserManager &userManage
         // 处理用户相关指令
         result += userManager.handleUserCommand(tokens_);
     }
+
+    if (State(cmd) == ParserState::TRAINCMD || cmd == QUERYTRAIN)
+    {
+        // 处理列车相关指令
+        result += trainManager.handleTrainCommand(tokens_);
+    }
     return result;
 }
 
 // 静态成员定义和静态表初始化结构体
 sjtu::unordered_map<std::string, TokenType> Parser::CMDTABLE;
 sjtu::unordered_map<std::string, TokenType> Parser::USERTABLE;
-sjtu::unordered_map<std::string, TokenType> Parser::TRAINTABLE;
-
-struct ParserStaticInit {
-    ParserStaticInit() {
+sjtu::unordered_map<std::string, TokenType> Parser::TRAINCOMMANDTABLE;
+sjtu::unordered_map<std::string, TokenType> Parser::TICKETCOMMANDTABLE;
+struct ParserStaticInit
+{
+    ParserStaticInit()
+    {
         Parser::CMDTABLE.insert({"login", LOGIN});
         Parser::CMDTABLE.insert({"logout", LOGOUT});
         Parser::CMDTABLE.insert({"add_user", ADDUSER});
@@ -140,16 +163,25 @@ struct ParserStaticInit {
         Parser::USERTABLE.insert({"-m", MAILADDRESS});
         Parser::USERTABLE.insert({"-g", PRIVILEGE});
 
-        Parser::TRAINTABLE.insert({"-i", TRAINID});
-        Parser::TRAINTABLE.insert({"-n", STATIONNUM});
-        Parser::TRAINTABLE.insert({"-m", SEATNUM});
-        Parser::TRAINTABLE.insert({"-s", STATIONS});
-        Parser::TRAINTABLE.insert({"-p", PRICES});
-        Parser::TRAINTABLE.insert({"-x", STARTTIME});
-        Parser::TRAINTABLE.insert({"-t", TRAVELTIMES});
-        Parser::TRAINTABLE.insert({"-o", STOPOVERTIMES});
-        Parser::TRAINTABLE.insert({"-d", SALEDATE});
-        Parser::TRAINTABLE.insert({"-y", TRAINTYPE});
+        Parser::TRAINCOMMANDTABLE.insert({"-i", TRAINID});
+        Parser::TRAINCOMMANDTABLE.insert({"-n", STATIONNUM});
+        Parser::TRAINCOMMANDTABLE.insert({"-m", SEATNUM});
+        Parser::TRAINCOMMANDTABLE.insert({"-s", STATIONS});
+        Parser::TRAINCOMMANDTABLE.insert({"-p", PRICES});
+        Parser::TRAINCOMMANDTABLE.insert({"-x", STARTTIME});
+        Parser::TRAINCOMMANDTABLE.insert({"-t", TRAVELTIMES});
+        Parser::TRAINCOMMANDTABLE.insert({"-o", STOPOVERTIMES});
+        Parser::TRAINCOMMANDTABLE.insert({"-d", SALEDATE});
+        Parser::TRAINCOMMANDTABLE.insert({"-y", TRAINTYPE});
+
+        Parser::TICKETCOMMANDTABLE.insert({"-i", TRAINID});
+        Parser::TICKETCOMMANDTABLE.insert({"-d", QUERYDATE});
+        Parser::TICKETCOMMANDTABLE.insert({"-s", STARTPLACE});
+        Parser::TICKETCOMMANDTABLE.insert({"-t", DESTINATION});
+        Parser::TICKETCOMMANDTABLE.insert({"-p", PRIORITY});
+        Parser::TICKETCOMMANDTABLE.insert({"-n", NUMBER});
+        Parser::TICKETCOMMANDTABLE.insert({"-f", STARTPLACE});
+        Parser::TICKETCOMMANDTABLE.insert({"-q", WAITING});
     }
 };
 static ParserStaticInit parser_static_init_instance;
