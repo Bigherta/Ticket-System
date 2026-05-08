@@ -440,7 +440,7 @@ public:
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
 
-        bufferPool = new BufferPoolManager<Node<order>>(7345, BPTree, root_pos);
+        bufferPool = new BufferPoolManager<Node<order>>(6500, BPTree, root_pos);
     }
     ~BPT()
     {
