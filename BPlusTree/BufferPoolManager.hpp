@@ -66,6 +66,16 @@ private:
     int get_b1_size() const { return b1.size(); }
     int get_b2_size() const { return b2.size(); }
 
+    bool has_evictable(sjtu::list<Frame> &list) const
+    {
+        for (auto it = list.begin(); it != list.end(); ++it)
+        {
+            if (it->page_id != root_pos)
+                return true;
+        }
+        return false;
+    }
+
     void replace(bool hit_in_ghost_b2 = false)
     {
         bool evict_from_t1 = false;
@@ -85,12 +95,32 @@ private:
 
         if (evict_from_t1)
         {
-            evict_from_list(t1, B1, b1);
+            if (has_evictable(t1))
+            {
+                evict_from_list(t1, B1, b1);
+                return;
+            }
+            if (has_evictable(t2))
+            {
+                evict_from_list(t2, B2, b2);
+                return;
+            }
         }
         else
         {
-            evict_from_list(t2, B2, b2);
+            if (has_evictable(t2))
+            {
+                evict_from_list(t2, B2, b2);
+                return;
+            }
+            if (has_evictable(t1))
+            {
+                evict_from_list(t1, B1, b1);
+                return;
+            }
         }
+
+        throw std::runtime_error("no evictable page (only root pinned?)");
     }
 
     void evict_from_list(sjtu::list<Frame> &list, ArcStatus ghost_status, sjtu::list<GhostEntry> &ghost_list)
