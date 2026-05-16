@@ -1,10 +1,11 @@
 #ifndef SJTU_UNORDERED_MAP_HPP
 #define SJTU_UNORDERED_MAP_HPP
 
-#include <string>
 #include <cstring>
-#include "vector.hpp"
+#include <string>
+#include "exceptions.hpp"
 #include "utility.hpp"
+#include "vector.hpp"
 
 namespace sjtu
 {
@@ -38,7 +39,8 @@ namespace sjtu
         static inline size_t hash_string(const std::string &s)
         {
             const size_t n = s.size();
-            if (n == 0) return static_cast<size_t>(FNV_OFFSET);
+            if (n == 0)
+                return static_cast<size_t>(FNV_OFFSET);
             const unsigned char *data = reinterpret_cast<const unsigned char *>(s.data());
 
             // fast path: process 8-byte chunks using unsigned long long pointer for throughput
@@ -149,8 +151,8 @@ namespace sjtu
         }
 
     public:
-        unordered_map(size_type bucket_cnt = 1024, double max_load_factor = 0.75)
-            : bucket_count_(next_pow2(bucket_cnt)), size_(0), max_load_factor_(max_load_factor)
+        unordered_map(size_type bucket_cnt = 1024, double max_load_factor = 0.75) :
+            bucket_count_(next_pow2(bucket_cnt)), size_(0), max_load_factor_(max_load_factor)
         {
             for (size_type i = 0; i < bucket_count_; ++i)
                 buckets.push_back(nullptr);
@@ -162,10 +164,7 @@ namespace sjtu
         unordered_map &operator=(const unordered_map &) = delete;
         unordered_map &operator=(unordered_map &&) = delete;
 
-        ~unordered_map()
-        {
-            clear();
-        }
+        ~unordered_map() { clear(); }
 
         void clear()
         {
@@ -198,6 +197,28 @@ namespace sjtu
 
             value_type &operator*() const { return cur->val; }
             value_type *operator->() const { return &(cur->val); }
+            iterator &operator++()
+            {
+                if (cur->next)
+                {
+                    cur = cur->next;
+                    return *this;
+                }
+                for (++idx; idx < mp->bucket_count_; ++idx)
+                    if (mp->buckets[idx])
+                    {
+                        cur = mp->buckets[idx];
+                        return *this;
+                    }
+                *this = mp->end();
+                return *this;
+            }
+            iterator operator++(int)
+            {
+                iterator old = *this;
+                ++(*this);
+                return old;
+            }
 
             bool operator==(const iterator &rhs) const { return mp == rhs.mp && cur == rhs.cur; }
 
@@ -206,7 +227,8 @@ namespace sjtu
 
         iterator begin()
         {
-            if (size_ == 0) return end();
+            if (size_ == 0)
+                return end();
             for (size_type i = 0; i < bucket_count_; ++i)
                 if (buckets[i])
                     return iterator(this, i, buckets[i]);
@@ -327,6 +349,20 @@ namespace sjtu
             ++size_;
             check_rehash();
             return n->val.second;
+        }
+
+        Value &at(const Key &key)
+        {
+            size_type hval = static_cast<size_type>(detail::HashKey<Key>::eval(key));
+            size_type idx = hval & (bucket_count_ - 1);
+            node *cur = buckets[idx];
+            while (cur)
+            {
+                if (cur->hash_val == hval && cur->val.first == key)
+                    return cur->val.second;
+                cur = cur->next;
+            }
+            throw sjtu::exception();
         }
 
         size_type size() const { return size_; }

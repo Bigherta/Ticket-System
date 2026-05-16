@@ -31,11 +31,17 @@ namespace sjtu
         runtime_error() {}
         runtime_error(const std::string &det) : exception(det) {}
     };
-    class invalid_iterator : public exception
+    class invalid_argument : public exception
+    {
+    public:
+        invalid_argument() {}
+        invalid_argument(const std::string &det) : exception(det) {}
+    };
+    class invalid_iterator : public invalid_argument
     {
     public:
         invalid_iterator() {}
-        invalid_iterator(const std::string &det) : exception(det) {}
+        invalid_iterator(const std::string &det) : invalid_argument(det) {}
     };
 
     class container_is_empty : public exception

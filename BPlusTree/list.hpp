@@ -137,9 +137,90 @@ namespace sjtu
         iterator begin() noexcept { return iterator{head->next}; }
         const_iterator cbegin() const noexcept { return const_iterator{head->next}; }
 
+        /* Return a reverse iterator pointing to the last element. */
+        class reverse_iterator {
+        public:
+            using difference_type = std::ptrdiff_t;
+            using value_type = T;
+            using pointer = T *;
+            using reference = T &;
+
+            reverse_iterator() = default;
+            explicit reverse_iterator(const iterator &it) : base_(it) {}
+
+            iterator base() const { return base_; }
+
+            reverse_iterator &operator++() {
+                --base_;
+                return *this;
+            }
+            reverse_iterator operator++(int) {
+                reverse_iterator tmp = *this;
+                ++(*this);
+                return tmp;
+            }
+            reverse_iterator &operator--() {
+                ++base_;
+                return *this;
+            }
+            reverse_iterator operator--(int) {
+                reverse_iterator tmp = *this;
+                --(*this);
+                return tmp;
+            }
+
+            reference operator*() const {
+                iterator tmp = base_;
+                --tmp;
+                return *tmp;
+            }
+            pointer operator->() const { iterator tmp = base_; --tmp; return tmp.operator->(); }
+
+            bool operator==(const reverse_iterator &rhs) const { return base_.ptr == rhs.base_.ptr; }
+            bool operator!=(const reverse_iterator &rhs) const { return !(*this == rhs); }
+
+        private:
+            iterator base_;
+        };
+
+        class const_reverse_iterator {
+        public:
+            using difference_type = std::ptrdiff_t;
+            using value_type = T;
+            using pointer = const T *;
+            using reference = const T &;
+
+            const_reverse_iterator() = default;
+            explicit const_reverse_iterator(const const_iterator &it) : base_(it) {}
+
+            const_iterator base() const { return base_; }
+
+            const_reverse_iterator &operator++() { --base_; return *this; }
+            const_reverse_iterator operator++(int) { const_reverse_iterator tmp = *this; ++(*this); return tmp; }
+            const_reverse_iterator &operator--() { ++base_; return *this; }
+            const_reverse_iterator operator--(int) { const_reverse_iterator tmp = *this; --(*this); return tmp; }
+
+            reference operator*() const { const_iterator tmp = base_; --tmp; return *tmp; }
+            pointer operator->() const { const_iterator tmp = base_; --tmp; return tmp.operator->(); }
+
+            bool operator==(const const_reverse_iterator &rhs) const { return base_.ptr == rhs.base_.ptr; }
+            bool operator!=(const const_reverse_iterator &rhs) const { return !(*this == rhs); }
+
+        private:
+            const_iterator base_;
+        };
+
+        reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+        const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(cend()); }
+        const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
+
         /* Return an iterator pointing to one past the last element. */
         iterator end() noexcept { return iterator{tail}; }
         const_iterator cend() const noexcept { return const_iterator{tail}; }
+
+        reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+        const_reverse_iterator rend() const noexcept { return const_reverse_iterator(cbegin()); }
+        const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
 
         /* Checks whether the container is empty. */
         bool empty() const noexcept { return length == 0; }

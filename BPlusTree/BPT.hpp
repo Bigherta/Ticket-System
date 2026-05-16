@@ -99,16 +99,16 @@ private:
             ++tree_size;
             for (int i = 0; i < newNode.size + 1; ++i)
             {
-                Node<order> &childNode = bufferPool->get(newNode.children[i]);
+                Node<order> &childNode = bufferPool->get(newNode.children[i], sjtu::AccessType::Lookup);
                 childNode.parent = new_node_pos;
-                bufferPool->put(newNode.children[i], childNode);
+                bufferPool->put(newNode.children[i], childNode, sjtu::AccessType::Index);
             }
         }
         // Capture middle key before shrinking the left node
         sjtu::pair<T, int> midKey = node.Keys[left_size];
         node.size = left_size;
         // Persist left node now so recursive splits won't be overwritten
-        bufferPool->put(node_pos, node);
+        bufferPool->put(node_pos, node, sjtu::AccessType::Index);
         if (node.parent == -1) // node is root, need to create new root
         {
             Node<order> newRoot;
@@ -122,12 +122,12 @@ private:
             node.parent = root_pos;
             newNode.parent = root_pos;
             // write updated parent pointers for the two children
-            bufferPool->put(node_pos, node);
-            bufferPool->put(new_node_pos, newNode);
+            bufferPool->put(node_pos, node, sjtu::AccessType::Index);
+            bufferPool->put(new_node_pos, newNode, sjtu::AccessType::Index);
         }
         else
         {
-            Node<order> &parentNode = bufferPool->get(node.parent);
+            Node<order> &parentNode = bufferPool->get(node.parent, sjtu::AccessType::Lookup);
             int pos = BinarySearch(parentNode.Keys, parentNode.size, midKey);
             for (int i = parentNode.size; i > pos; --i)
                 parentNode.Keys[i] = parentNode.Keys[i - 1];
@@ -143,17 +143,17 @@ private:
                 split(parentNode, node.parent);
             }
             else
-                bufferPool->put(node.parent, parentNode);
+                bufferPool->put(node.parent, parentNode, sjtu::AccessType::Index);
         }
     }
 
     void fix_parent(int node_pos, const sjtu::pair<T, int> &new_min, sjtu::vector<int> &trace_index)
     {
-        Node<order> node = bufferPool->get(node_pos);
+        Node<order> node = bufferPool->get(node_pos, sjtu::AccessType::Lookup);
 
         while (node.parent != -1)
         {
-            Node<order> parentNode = bufferPool->get(node.parent);
+            Node<order> parentNode = bufferPool->get(node.parent, sjtu::AccessType::Lookup);
             int child_index = -1;
 
             if (!trace_index.empty())
@@ -182,7 +182,7 @@ private:
             }
 
             parentNode.Keys[child_index - 1] = new_min;
-            bufferPool->put(node.parent, parentNode);
+            bufferPool->put(node.parent, parentNode, sjtu::AccessType::Index);
 
             return;
         }
@@ -193,20 +193,20 @@ private:
         {
             if (!node.isLeaf && node.size == 0)
             {
-                root_pos = node.children[0];
-                Node<order> newRoot = bufferPool->get(root_pos);
-                newRoot.parent = -1;
-                bufferPool->put(root_pos, newRoot);
+                    root_pos = node.children[0];
+                    Node<order> newRoot = bufferPool->get(root_pos, sjtu::AccessType::Lookup);
+                    newRoot.parent = -1;
+                    bufferPool->put(root_pos, newRoot, sjtu::AccessType::Index);
                 bufferPool->Delete(node_pos);
                 --tree_size;
             }
             else
             {
-                bufferPool->put(node_pos, node);
+                    bufferPool->put(node_pos, node, sjtu::AccessType::Index);
             }
             return;
         }
-        Node<order> parentNode = bufferPool->get(node.parent);
+        Node<order> parentNode = bufferPool->get(node.parent, sjtu::AccessType::Lookup);
         int parent_pos = node.parent;
         int index = -1;
         if (!trace_index.empty())
@@ -233,7 +233,7 @@ private:
         {
             if (HasLeftSibling)
             {
-                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1], sjtu::AccessType::Lookup);
                 if (leftSibling.size > min_leaf_keys_non_root) // borrow from left sibling
                 {
                     for (int i = node.size; i > 0; --i)
@@ -242,15 +242,15 @@ private:
                     parentNode.Keys[index - 1] = node.Keys[0];
                     --leftSibling.size;
                     ++node.size;
-                    bufferPool->put(node.parent, parentNode);
-                    bufferPool->put(parentNode.children[index - 1], leftSibling);
-                    bufferPool->put(node_pos, node);
+                    bufferPool->put(node.parent, parentNode, sjtu::AccessType::Index);
+                    bufferPool->put(parentNode.children[index - 1], leftSibling, sjtu::AccessType::Index);
+                    bufferPool->put(node_pos, node, sjtu::AccessType::Index);
                     return;
                 }
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1], sjtu::AccessType::Lookup);
                 if (rightSibling.size > min_leaf_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = rightSibling.Keys[0];
@@ -259,20 +259,20 @@ private:
                     parentNode.Keys[index] = rightSibling.Keys[0];
                     --rightSibling.size;
                     ++node.size;
-                    bufferPool->put(node.parent, parentNode);
-                    bufferPool->put(parentNode.children[index + 1], rightSibling);
-                    bufferPool->put(node_pos, node);
+                    bufferPool->put(node.parent, parentNode, sjtu::AccessType::Index);
+                    bufferPool->put(parentNode.children[index + 1], rightSibling, sjtu::AccessType::Index);
+                    bufferPool->put(node_pos, node, sjtu::AccessType::Index);
                     return;
                 }
             }
             if (HasLeftSibling)
             {
-                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1], sjtu::AccessType::Lookup);
                 for (int i = leftSibling.size; i < leftSibling.size + node.size; ++i)
                     leftSibling.Keys[i] = node.Keys[i - leftSibling.size];
                 leftSibling.size += node.size;
                 leftSibling.next = node.next;
-                bufferPool->put(parentNode.children[index - 1], leftSibling);
+                bufferPool->put(parentNode.children[index - 1], leftSibling, sjtu::AccessType::Index);
                 bufferPool->Delete(node_pos);
                 tree_size--;
                 for (int i = index; i < parentNode.size; ++i)
@@ -286,18 +286,18 @@ private:
                 }
                 else
                 {
-                    bufferPool->put(parent_pos, parentNode);
+                    bufferPool->put(parent_pos, parentNode, sjtu::AccessType::Index);
                 }
                 return;
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1], sjtu::AccessType::Lookup);
                 for (int i = node.size; i < node.size + rightSibling.size; ++i)
                     node.Keys[i] = rightSibling.Keys[i - node.size];
                 node.size += rightSibling.size;
                 node.next = rightSibling.next;
-                bufferPool->put(node_pos, node);
+                bufferPool->put(node_pos, node, sjtu::AccessType::Index);
                 bufferPool->Delete(parentNode.children[index + 1]);
                 tree_size--;
                 for (int i = index + 1; i < parentNode.size; ++i)
@@ -311,7 +311,7 @@ private:
                 }
                 else
                 {
-                    bufferPool->put(parent_pos, parentNode);
+                    bufferPool->put(parent_pos, parentNode, sjtu::AccessType::Index);
                 }
                 return;
             }
@@ -320,7 +320,7 @@ private:
         {
             if (HasLeftSibling)
             {
-                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1], sjtu::AccessType::Lookup);
                 if (leftSibling.size > min_internal_keys_non_root) // borrow from left sibling
                 {
                     for (int i = node.size; i > 0; --i)
@@ -329,21 +329,21 @@ private:
                         node.children[i] = node.children[i - 1];
                     node.Keys[0] = parentNode.Keys[index - 1];
                     node.children[0] = leftSibling.children[leftSibling.size];
-                    Node<order> moveNode = bufferPool->get(node.children[0]);
+                    Node<order> moveNode = bufferPool->get(node.children[0], sjtu::AccessType::Lookup);
                     moveNode.parent = node_pos;
-                    bufferPool->put(node.children[0], moveNode);
+                    bufferPool->put(node.children[0], moveNode, sjtu::AccessType::Index);
                     parentNode.Keys[index - 1] = leftSibling.Keys[leftSibling.size - 1];
                     --leftSibling.size;
                     ++node.size;
-                    bufferPool->put(node.parent, parentNode);
-                    bufferPool->put(parentNode.children[index - 1], leftSibling);
-                    bufferPool->put(node_pos, node);
+                    bufferPool->put(node.parent, parentNode, sjtu::AccessType::Index);
+                    bufferPool->put(parentNode.children[index - 1], leftSibling, sjtu::AccessType::Index);
+                    bufferPool->put(node_pos, node, sjtu::AccessType::Index);
                     return;
                 }
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1], sjtu::AccessType::Lookup);
                 if (rightSibling.size > min_internal_keys_non_root) // borrow from right sibling
                 {
                     node.Keys[node.size] = parentNode.Keys[index];
@@ -353,20 +353,20 @@ private:
                         rightSibling.Keys[i] = rightSibling.Keys[i + 1];
                     for (int i = 0; i < rightSibling.size; ++i)
                         rightSibling.children[i] = rightSibling.children[i + 1];
-                    Node<order> moveNode = bufferPool->get(node.children[node.size + 1]);
+                    Node<order> moveNode = bufferPool->get(node.children[node.size + 1], sjtu::AccessType::Lookup);
                     moveNode.parent = node_pos;
-                    bufferPool->put(node.children[node.size + 1], moveNode);
+                    bufferPool->put(node.children[node.size + 1], moveNode, sjtu::AccessType::Index);
                     --rightSibling.size;
                     ++node.size;
-                    bufferPool->put(node.parent, parentNode);
-                    bufferPool->put(parentNode.children[index + 1], rightSibling);
-                    bufferPool->put(node_pos, node);
+                    bufferPool->put(node.parent, parentNode, sjtu::AccessType::Index);
+                    bufferPool->put(parentNode.children[index + 1], rightSibling, sjtu::AccessType::Index);
+                    bufferPool->put(node_pos, node, sjtu::AccessType::Index);
                     return;
                 }
             }
             if (HasLeftSibling)
             {
-                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1]);
+                Node<order> leftSibling = bufferPool->get(parentNode.children[index - 1], sjtu::AccessType::Lookup);
                 int old_left_size = leftSibling.size;
                 leftSibling.Keys[old_left_size] = parentNode.Keys[index - 1];
                 for (int i = 0; i < node.size; ++i)
@@ -374,12 +374,12 @@ private:
                 for (int i = 0; i <= node.size; ++i)
                 {
                     leftSibling.children[old_left_size + 1 + i] = node.children[i];
-                    Node<order> moveNode = bufferPool->get(node.children[i]);
+                    Node<order> moveNode = bufferPool->get(node.children[i], sjtu::AccessType::Lookup);
                     moveNode.parent = parentNode.children[index - 1];
-                    bufferPool->put(node.children[i], moveNode);
+                    bufferPool->put(node.children[i], moveNode, sjtu::AccessType::Index);
                 }
                 leftSibling.size = old_left_size + node.size + 1;
-                bufferPool->put(parentNode.children[index - 1], leftSibling);
+                bufferPool->put(parentNode.children[index - 1], leftSibling, sjtu::AccessType::Index);
                 bufferPool->Delete(node_pos);
                 tree_size--;
                 for (int i = index; i < parentNode.size; ++i)
@@ -393,13 +393,13 @@ private:
                 }
                 else
                 {
-                    bufferPool->put(parent_pos, parentNode);
+                    bufferPool->put(parent_pos, parentNode, sjtu::AccessType::Index);
                 }
                 return;
             }
             if (HasRightSibling)
             {
-                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1]);
+                Node<order> rightSibling = bufferPool->get(parentNode.children[index + 1], sjtu::AccessType::Lookup);
                 int old_node_size = node.size;
                 node.Keys[old_node_size] = parentNode.Keys[index];
                 for (int i = 0; i < rightSibling.size; ++i)
@@ -407,12 +407,12 @@ private:
                 for (int i = 0; i <= rightSibling.size; ++i)
                 {
                     node.children[old_node_size + 1 + i] = rightSibling.children[i];
-                    Node<order> moveNode = bufferPool->get(rightSibling.children[i]);
+                    Node<order> moveNode = bufferPool->get(rightSibling.children[i], sjtu::AccessType::Lookup);
                     moveNode.parent = node_pos;
-                    bufferPool->put(rightSibling.children[i], moveNode);
+                    bufferPool->put(rightSibling.children[i], moveNode, sjtu::AccessType::Index);
                 }
                 node.size = old_node_size + rightSibling.size + 1;
-                bufferPool->put(node_pos, node);
+                bufferPool->put(node_pos, node, sjtu::AccessType::Index);
                 bufferPool->Delete(parentNode.children[index + 1]);
                 tree_size--;
                 for (int i = index + 1; i < parentNode.size; ++i)
@@ -426,7 +426,7 @@ private:
                 }
                 else
                 {
-                    bufferPool->put(parent_pos, parentNode);
+                    bufferPool->put(parent_pos, parentNode, sjtu::AccessType::Index);
                 }
                 return;
             }
@@ -464,14 +464,14 @@ public:
         }
         else
         {
-            Node<order> node = bufferPool->get(root_pos);
+            Node<order> node = bufferPool->get(root_pos, sjtu::AccessType::Lookup);
             int node_pos = root_pos;
             while (!node.isLeaf)
             {
                 // Keep order by (key, value) so duplicated keys with different values are all indexed.
                 int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
                 node_pos = node.children[child_index];
-                node = bufferPool->get(node_pos);
+                node = bufferPool->get(node_pos, sjtu::AccessType::Index);
             }
             int insert_index = BinarySearch(node.Keys, node.size, keyValuePair);
             for (int i = node.size; i > insert_index; --i)
@@ -481,7 +481,7 @@ public:
             if (node.size > max_keys) // node overflow, need to split
                 split(node, node_pos);
             else
-                bufferPool->put(node_pos, node);
+                bufferPool->put(node_pos, node, sjtu::AccessType::Index);
         }
     }
     void remove(const T &key, int value)
@@ -491,7 +491,7 @@ public:
             return;
         }
         sjtu::vector<int> trace_index; // index of the child in the parent node
-        Node<order> node = bufferPool->get(root_pos);
+        Node<order> node = bufferPool->get(root_pos, sjtu::AccessType::Lookup);
         int node_pos = root_pos;
         sjtu::pair<T, int> keyValuePair(key, value);
         while (!node.isLeaf)
@@ -499,7 +499,7 @@ public:
             int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
             trace_index.push_back(child_index);
             node_pos = node.children[child_index];
-            node = bufferPool->get(node_pos);
+            node = bufferPool->get(node_pos, sjtu::AccessType::Index);
         }
         int upper_index = BinarySearch(node.Keys, node.size, keyValuePair);
         if (upper_index == 0 || node.Keys[upper_index - 1] != keyValuePair)
@@ -511,10 +511,11 @@ public:
         --node.size;
 
         // Persist leaf mutation first so subtree_min_key sees fresh data.
-        bufferPool->put(node_pos, node);
+        bufferPool->put(node_pos, node, sjtu::AccessType::Index);
 
-        // If the deleted key was the first key, subtree minimum may have changed.
-        if (upper_index == 1)
+        // If the deleted key was the first key and the leaf is still non-empty,
+        // the subtree minimum may have changed.
+        if (upper_index == 1 && node.size > 0)
             fix_parent(node_pos, node.Keys[0], trace_index);
 
         int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
@@ -562,14 +563,13 @@ public:
             return;
         }
 
-        Node<order> node = bufferPool->get(root_pos);
+        Node<order> node = bufferPool->get(root_pos, sjtu::AccessType::Lookup);
         int child_index = BinarySearch(node.Keys, node.size, key);
         while (!node.isLeaf)
         {
-            node = bufferPool->get(node.children[child_index]);
+            node = bufferPool->get(node.children[child_index], sjtu::AccessType::Index);
             child_index = BinarySearch(node.Keys, node.size, key);
         }
-
         int scan_index = child_index;
         if (scan_index >= node.size)
         {
@@ -578,7 +578,7 @@ public:
                 std::cout << "null\n";
                 return;
             }
-            node = bufferPool->get(node.next);
+            node = bufferPool->get(node.next, sjtu::AccessType::Scan);
             scan_index = 0;
         }
 
@@ -614,7 +614,7 @@ public:
             {
                 if (node.next == -1)
                     break;
-                node = bufferPool->get(node.next);
+                node = bufferPool->get(node.next, sjtu::AccessType::Scan);
                 scan_index = 0;
             }
         }

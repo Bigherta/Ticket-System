@@ -10,6 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(ticket_system
 	BPlusTree/main.cpp
+	BPlusTree/arc_replacer.cpp
 )
 
 set_target_properties(ticket_system PROPERTIES
