@@ -7,6 +7,15 @@
 template<class Page>
 class BufferPoolManager
 {
+public:
+    enum class AccessType
+    {
+        Unknown,
+        Lookup,
+        Scan,
+        Index
+    };
+
 private:
     enum ArcStatus
     {
@@ -15,6 +24,7 @@ private:
         B1, // Ghost list from T1
         B2 // Ghost list from T2
     };
+    static constexpr int K_SCAN_PROMOTION_THRESHOLD = 3;
 
     struct Frame
     {
@@ -23,6 +33,7 @@ private:
         bool dirty = false;
         bool is_deleted = false;
         ArcStatus status = T1;
+        AccessType access_type = AccessType::Unknown;
     };
 
     struct GhostEntry
@@ -56,6 +67,9 @@ private:
 
     sjtu::unordered_map<int, PageTableEntry> page_table;
     sjtu::unordered_map<int, GhostPageTableEntry> ghost_table;
+
+    // scan counter: page_id -> number of consecutive Scan accesses
+    sjtu::unordered_map<int, int> scan_counter_;
 
     int p = 0;
 
@@ -135,6 +149,7 @@ private:
                 continue;
 
             int pid = it->page_id;
+            bool is_scan = (it->access_type == AccessType::Scan);
 
             if (it->dirty && !it->is_deleted)
                 disk.update(it->page, pid);
@@ -142,7 +157,8 @@ private:
             if (it->is_deleted)
                 disk.Delete(pid);
 
-            if (!it->is_deleted)
+            // Scan pages are not added to ghost lists
+            if (!it->is_deleted && !is_scan)
             {
                 ghost_list.push_front({pid});
                 ghost_table[pid] = {ghost_list.begin(), ghost_status};
@@ -189,6 +205,7 @@ private:
                 }
             }
 
+            scan_counter_.erase(pid);
             page_table.erase(pid);
             list.erase(it);
             return;
@@ -200,7 +217,7 @@ private:
 public:
     BufferPoolManager(int cap, MemoryRiver<Page> &mr, int &root) : capacity(cap), disk(mr), root_pos(root), p(0) {}
 
-    Page &get(int page_id)
+    Page &get(int page_id, AccessType access_type)
     {
         auto pt_it = page_table.find(page_id);
 
@@ -214,15 +231,45 @@ public:
                 if (frame_it->is_deleted)
                     throw std::runtime_error("access deleted page");
 
-                Frame frame = *frame_it;
-                frame.status = T2;
-                t1.erase(frame_it);
+                if (access_type == AccessType::Scan)
+                {
+                    // Window-based promotion for Scan accesses:
+                    // increment counter, promote to T2 only if threshold reached.
+                    auto &cnt = scan_counter_[page_id];
+                    cnt++;
+                    if (cnt >= K_SCAN_PROMOTION_THRESHOLD)
+                    {
+                        Frame frame = *frame_it;
+                        frame.status = T2;
+                        frame.access_type = access_type;
+                        t1.erase(frame_it);
 
-                t2.push_front(frame);
-                entry.frame_it = t2.begin();
-                entry.status = T2;
+                        t2.push_front(frame);
+                        entry.frame_it = t2.begin();
+                        entry.status = T2;
 
-                return t2.front().page;
+                        scan_counter_.erase(page_id);
+                        return t2.front().page;
+                    }
+                    // Not enough consecutive Scan accesses yet, stay in T1
+                    frame_it->access_type = access_type;
+                    return frame_it->page;
+                }
+                else
+                {
+                    // Lookup, Index, or Unknown: immediate promotion to T2
+                    Frame frame = *frame_it;
+                    frame.status = T2;
+                    frame.access_type = access_type;
+                    t1.erase(frame_it);
+
+                    t2.push_front(frame);
+                    entry.frame_it = t2.begin();
+                    entry.status = T2;
+
+                    scan_counter_.erase(page_id);
+                    return t2.front().page;
+                }
             }
             else if (entry.status == T2)
             {
@@ -232,6 +279,7 @@ public:
 
                 t2.splice(t2.begin(), t2, frame_it);
                 entry.frame_it = t2.begin();
+                frame_it->access_type = access_type;
 
                 return t2.front().page;
             }
@@ -239,20 +287,30 @@ public:
 
         auto gt_it = ghost_table.find(page_id);
         bool hit_in_ghost_b2 = false;
+        bool is_scan = (access_type == AccessType::Scan);
+
         if (gt_it != ghost_table.end())
         {
             auto ghost_entry = gt_it->second;
 
             if (ghost_entry.status == B1)
             {
-                int delta = (get_b1_size() >= get_b2_size() || get_b2_size() == 0) ? 1 : get_b2_size() / get_b1_size();
-                p = std::min(capacity, p + delta);
+                if (!is_scan)
+                {
+                    int delta =
+                            (get_b1_size() >= get_b2_size() || get_b2_size() == 0) ? 1 : get_b2_size() / get_b1_size();
+                    p = std::min(capacity, p + delta);
+                }
                 b1.erase(ghost_entry.ghost_it);
             }
             else if (ghost_entry.status == B2)
             {
-                int delta = (get_b2_size() >= get_b1_size() || get_b1_size() == 0) ? 1 : get_b1_size() / get_b2_size();
-                p = std::max(0, p - delta);
+                if (!is_scan)
+                {
+                    int delta =
+                            (get_b2_size() >= get_b1_size() || get_b1_size() == 0) ? 1 : get_b1_size() / get_b2_size();
+                    p = std::max(0, p - delta);
+                }
                 b2.erase(ghost_entry.ghost_it);
                 hit_in_ghost_b2 = true;
             }
@@ -267,10 +325,21 @@ public:
             Page page;
             disk.read(page, page_id);
 
-            t2.push_front({page_id, page, false, false, T2});
-            page_table[page_id] = {t2.begin(), T2};
-
-            return t2.front().page;
+            if (is_scan)
+            {
+                // Scan access from ghost: insert into T1 with scan counter
+                t1.push_front({page_id, page, false, false, T1, access_type});
+                page_table[page_id] = {t1.begin(), T1};
+                scan_counter_[page_id] = 1;
+                return t1.front().page;
+            }
+            else
+            {
+                // Non-scan access from ghost: insert into T2
+                t2.push_front({page_id, page, false, false, T2, access_type});
+                page_table[page_id] = {t2.begin(), T2};
+                return t2.front().page;
+            }
         }
 
         Page page;
@@ -279,13 +348,27 @@ public:
         if (get_t1_size() + get_t2_size() >= capacity)
             replace();
 
-        t1.push_front({page_id, page, false, false, T1});
-        page_table[page_id] = {t1.begin(), T1};
-
-        return t1.front().page;
+        if (access_type == AccessType::Lookup || access_type == AccessType::Index)
+        {
+            // Point lookup / Index probe: insert directly into T2 (MFU)
+            t2.push_front({page_id, page, false, false, T2, access_type});
+            page_table[page_id] = {t2.begin(), T2};
+            return t2.front().page;
+        }
+        else
+        {
+            // Unknown or Scan: insert into T1 (MRU)
+            t1.push_front({page_id, page, false, false, T1, access_type});
+            page_table[page_id] = {t1.begin(), T1};
+            if (access_type == AccessType::Scan)
+            {
+                scan_counter_[page_id] = 1;
+            }
+            return t1.front().page;
+        }
     }
 
-    void put(int page_id, const Page &page)
+    void put(int page_id, const Page &page, AccessType access_type)
     {
         auto pt_it = page_table.find(page_id);
 
@@ -300,38 +383,78 @@ public:
 
             if (entry.status == T1)
             {
-                Frame frame = *frame_it;
-                frame.status = T2;
-                t1.erase(frame_it);
+                if (access_type == AccessType::Scan)
+                {
+                    // Window-based promotion for Scan accesses
+                    auto &cnt = scan_counter_[page_id];
+                    cnt++;
+                    if (cnt >= K_SCAN_PROMOTION_THRESHOLD)
+                    {
+                        Frame frame = *frame_it;
+                        frame.status = T2;
+                        frame.access_type = access_type;
+                        t1.erase(frame_it);
 
-                t2.push_front(frame);
-                entry.frame_it = t2.begin();
-                entry.status = T2;
+                        t2.push_front(frame);
+                        entry.frame_it = t2.begin();
+                        entry.status = T2;
+
+                        scan_counter_.erase(page_id);
+                    }
+                    else
+                    {
+                        frame_it->access_type = access_type;
+                    }
+                }
+                else
+                {
+                    Frame frame = *frame_it;
+                    frame.status = T2;
+                    frame.access_type = access_type;
+                    t1.erase(frame_it);
+
+                    t2.push_front(frame);
+                    entry.frame_it = t2.begin();
+                    entry.status = T2;
+
+                    scan_counter_.erase(page_id);
+                }
             }
             else if (entry.status == T2)
             {
                 t2.splice(t2.begin(), t2, frame_it);
                 entry.frame_it = t2.begin();
+                frame_it->access_type = access_type;
             }
         }
         else
         {
             auto gt_it = ghost_table.find(page_id);
             bool hit_in_ghost_b2 = false;
+            bool is_scan = (access_type == AccessType::Scan);
+
             if (gt_it != ghost_table.end())
             {
                 if (gt_it->second.status == B1)
                 {
-                    int delta =
-                            (get_b1_size() >= get_b2_size() || get_b2_size() == 0) ? 1 : get_b2_size() / get_b1_size();
-                    p = std::min(capacity, p + delta);
+                    if (!is_scan)
+                    {
+                        int delta = (get_b1_size() >= get_b2_size() || get_b2_size() == 0)
+                                            ? 1
+                                            : get_b2_size() / get_b1_size();
+                        p = std::min(capacity, p + delta);
+                    }
                     b1.erase(gt_it->second.ghost_it);
                 }
                 else
                 {
-                    int delta =
-                            (get_b2_size() >= get_b1_size() || get_b1_size() == 0) ? 1 : get_b1_size() / get_b2_size();
-                    p = std::max(0, p - delta);
+                    if (!is_scan)
+                    {
+                        int delta = (get_b2_size() >= get_b1_size() || get_b1_size() == 0)
+                                            ? 1
+                                            : get_b1_size() / get_b2_size();
+                        p = std::max(0, p - delta);
+                    }
                     b2.erase(gt_it->second.ghost_it);
                     hit_in_ghost_b2 = true;
                 }
@@ -340,16 +463,37 @@ public:
                 if (get_t1_size() + get_t2_size() >= capacity)
                     replace(hit_in_ghost_b2);
 
-                t2.push_front({page_id, page, true, false, T2});
-                page_table[page_id] = {t2.begin(), T2};
+                if (is_scan)
+                {
+                    t1.push_front({page_id, page, true, false, T1, access_type});
+                    page_table[page_id] = {t1.begin(), T1};
+                    scan_counter_[page_id] = 1;
+                }
+                else
+                {
+                    t2.push_front({page_id, page, true, false, T2, access_type});
+                    page_table[page_id] = {t2.begin(), T2};
+                }
             }
             else
             {
                 if (get_t1_size() + get_t2_size() >= capacity)
                     replace();
 
-                t1.push_front({page_id, page, true, false, T1});
-                page_table[page_id] = {t1.begin(), T1};
+                if (access_type == AccessType::Lookup || access_type == AccessType::Index)
+                {
+                    t2.push_front({page_id, page, true, false, T2, access_type});
+                    page_table[page_id] = {t2.begin(), T2};
+                }
+                else
+                {
+                    t1.push_front({page_id, page, true, false, T1, access_type});
+                    page_table[page_id] = {t1.begin(), T1};
+                    if (access_type == AccessType::Scan)
+                    {
+                        scan_counter_[page_id] = 1;
+                    }
+                }
             }
         }
     }
@@ -370,6 +514,7 @@ public:
                 t2.erase(entry.frame_it);
             }
             page_table.erase(pt_it);
+            scan_counter_.erase(page_id);
         }
 
         auto gt_it = ghost_table.find(page_id);
@@ -396,7 +541,7 @@ public:
         if (get_t1_size() + get_t2_size() >= capacity)
             replace();
 
-        t1.push_front({pos, page, false, false, T1});
+        t1.push_front({pos, page, false, false, T1, AccessType::Unknown});
         page_table[pos] = {t1.begin(), T1};
 
         return pos;
@@ -410,6 +555,7 @@ public:
             {
                 disk.Delete(it->page_id);
                 page_table.erase(it->page_id);
+                scan_counter_.erase(it->page_id);
                 it = t1.erase(it);
             }
             else
@@ -429,6 +575,7 @@ public:
             {
                 disk.Delete(it->page_id);
                 page_table.erase(it->page_id);
+                scan_counter_.erase(it->page_id);
                 it = t2.erase(it);
             }
             else
