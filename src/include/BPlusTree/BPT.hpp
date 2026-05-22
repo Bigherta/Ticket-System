@@ -64,7 +64,7 @@ private:
     int root_pos = 2 * sizeof(int); // position of the root node in the file
     int tree_size = 0; // number of nodes in the tree
     MemoryRiver<Node<order>> BPTree;
-    BufferPoolManager<Node<order>> *bufferPool;
+    BufferPoolManagerForBPT<Node<order>> *bufferPool;
     void split(Node<order> &node, int node_pos)
     {
         int left_size = order / 2; // number of keys to keep in the left node

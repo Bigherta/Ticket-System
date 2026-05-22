@@ -1,4 +1,4 @@
-#include "../../include/Grammar/parser.hpp"
+#include "../include/Grammar/parser.hpp"
 // 将关键字根据解析状态匹配成对应的枚举类
 TokenType Parser::matchkeyword(ParserState state, const std::string &text) const
 {

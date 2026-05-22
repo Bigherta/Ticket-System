@@ -1,7 +1,7 @@
 #include <iostream>
-#include "../include/Grammar/parser.hpp"
-#include "../include/User/user.hpp"
-#include "../include/Train/train.hpp"
+#include "include/Grammar/parser.hpp"
+#include "include/User/user.hpp"
+#include "include/Train/train.hpp"
 /**
  * @brief 程序入口
  *

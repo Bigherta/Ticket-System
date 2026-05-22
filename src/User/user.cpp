@@ -1,6 +1,9 @@
-#include "../../include/User/user.hpp"
-#include "../../include/Validator/validator.hpp"
-UserManager::UserManager() : userIndex("userIndex.dat") { userDatabase.initialise("userDatabase.dat"); }
+#include "../include/User/user.hpp"
+#include "../include/Validator/validator.hpp"
+UserManager::UserManager() : userIndex("userIndex.dat"), userBufferPool(1000, userDatabase) 
+{ 
+    userDatabase.initialise("userDatabase.dat"); 
+}
 
 std::string UserManager::registerUser(const std::string &cur_User, const std::string &username_,
                                       const std::string &password_, const std::string &name_,
@@ -12,7 +15,7 @@ std::string UserManager::registerUser(const std::string &cur_User, const std::st
     if (userIndex.empty())
     {
         User newUser(username_, password_, name_, mailAddr_, 10);
-        int addr = userDatabase.write(newUser);
+        int addr = userBufferPool.new_page(newUser);
         userIndex.insert(UserName{username_}, addr);
     }
     else
@@ -24,15 +27,14 @@ std::string UserManager::registerUser(const std::string &cur_User, const std::st
         auto existing = userIndex.visit(UserName{username_});
         if (!existing.empty())
             return "-1"; // 用户名已存在
-        User curUser;
         auto cur_pos = userIndex.visit(UserName{cur_User});
         if (cur_pos.empty())
             return "-1"; // 当前用户不存在
-        userDatabase.read(curUser, cur_pos[0]);
+        User curUser = userBufferPool.get(cur_pos[0]);
         if (curUser.privilege <= privilegeLevel_)
             return "-1"; // 当前用户权限不足
         User newUser(username_, password_, name_, mailAddr_, privilegeLevel_);
-        int addr = userDatabase.write(newUser);
+        int addr = userBufferPool.new_page(newUser);
         userIndex.insert(UserName{username_}, addr);
     }
     return "0";
@@ -49,8 +51,7 @@ std::string UserManager::login(const std::string &username_, const std::string &
     auto pos_list = userIndex.visit(UserName{username_});
     if (pos_list.empty())
         return "-1"; // 用户不存在
-    User user;
-    userDatabase.read(user, pos_list[0]);
+    User user = userBufferPool.get(pos_list[0]);
     if (User::hash_password(password_, user.salt) != user.password)
         return "-1"; // 密码错误
     logset.emplace(username_);
@@ -79,9 +80,9 @@ std::string UserManager::queryUser(const std::string &cur_User, const std::strin
     auto cur_pos = userIndex.visit(UserName{cur_User});
     if (cur_pos.empty())
         return "-1"; // 当前用户不存在
-    userDatabase.read(curUser, cur_pos[0]);
+    curUser = userBufferPool.get(cur_pos[0]);
     User targetUser;
-    userDatabase.read(targetUser, target_pos[0]);
+    targetUser = userBufferPool.get(target_pos[0]);
     // 允许查询的条件：操作者是目标用户本人，或操作者权限严格大于目标用户
     if (cur_User != username_ && curUser.privilege <= targetUser.privilege)
         return "-1"; // 当前用户权限不足
@@ -101,9 +102,9 @@ std::string UserManager::modifyUser(const std::string &cur_User, const std::stri
     auto cur_pos = userIndex.visit(UserName{cur_User});
     if (cur_pos.empty())
         return "-1"; // 当前用户不存在
-    userDatabase.read(curUser, cur_pos[0]);
+    curUser = userBufferPool.get(cur_pos[0]);
     User targetUser;
-    userDatabase.read(targetUser, target_pos[0]);
+    targetUser = userBufferPool.get(target_pos[0]);
 
     // 权限：操作者必须是目标用户本人，或操作者权限严格大于目标用户
     if (cur_User != username_ && curUser.privilege <= targetUser.privilege)
@@ -132,8 +133,7 @@ std::string UserManager::modifyUser(const std::string &cur_User, const std::stri
         targetUser.privilege = std::stoi(privilege_str);
 
     // 写回数据库
-    userDatabase.update(targetUser, target_pos[0]);
-
+    userBufferPool.put(target_pos[0], targetUser);
     return targetUser.to_string();
 }
 
@@ -291,6 +291,7 @@ void UserManager::clean()
 {
     // 清空所有用户数据与索引，并下线所有用户
     userIndex.clear();
+    userBufferPool.flush_all();
     userDatabase.clear();
     logset.clear();
 }

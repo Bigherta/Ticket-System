@@ -159,6 +159,8 @@ private:
     BPT<UserName, int> userIndex;
     /// 用户数据库， 使用MemoryRiver存储 User 对象
     MemoryRiver<User> userDatabase;
+    // 缓存池
+    BufferPoolManager<User> userBufferPool;
     /// 用户操作记录集合，每条记录为username
     sjtu::set<std::string> logset;
 };

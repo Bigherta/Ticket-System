@@ -1,4 +1,4 @@
-#include "../../include/Grammar/Token.hpp"
+#include "../include/Grammar/Token.hpp"
 
 TokenStream::TokenStream(sjtu::vector<Token> &&tokens) : tokens_(std::move(tokens)), cursor_(0) {}
 

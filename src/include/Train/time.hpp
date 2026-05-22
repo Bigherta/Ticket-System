@@ -13,6 +13,17 @@ struct Time
         minute = std::stoi(time_str.substr(3, 2));
     }
     int operator-(const Time &other) const { return (hour - other.hour) * 60 + (minute - other.minute); }
+    bool operator<(const Time &other) const
+    {
+        if (hour != other.hour)
+            return hour < other.hour;
+        return minute < other.minute;
+    }
+    bool operator==(const Time &other) const { return hour == other.hour && minute == other.minute; }
+    bool operator!=(const Time &other) const { return !(*this == other); }
+    bool operator<=(const Time &other) const { return *this < other || *this == other; }
+    bool operator>(const Time &other) const { return !(*this <= other); }
+    bool operator>=(const Time &other) const { return !(*this < other); }
 };
 
 struct Date
@@ -21,11 +32,12 @@ struct Date
     int day;
     Date() : month(0), day(0) {}
     Date(int m, int d) : month(m), day(d) {}
-    Date(std::string date_str)
+    Date(const std::string &date_str)
     {
         month = std::stoi(date_str.substr(0, 2));
         day = std::stoi(date_str.substr(3, 2));
     }
+    bool operator!=(const Date &other) const { return month != other.month || day != other.day; }
     bool operator<(const Date &other) const
     {
         if (month != other.month)
@@ -34,6 +46,8 @@ struct Date
     }
     bool operator==(const Date &other) const { return month == other.month && day == other.day; }
     bool operator<=(const Date &other) const { return *this < other || *this == other; }
+    bool operator>(const Date &other) const { return !(*this <= other); }
+    bool operator>=(const Date &other) const { return !(*this < other); }
 };
 
 struct AccurateTime
@@ -75,6 +89,28 @@ struct AccurateTime
         char buffer[20];
         std::snprintf(buffer, sizeof(buffer), "%02d-%02d %02d:%02d", date.month, date.day, time.hour, time.minute);
         return std::string(buffer);
+    }
+    bool operator<(const AccurateTime &other) const
+    {
+        if (date != other.date)
+            return date < other.date;
+        if (time.hour != other.time.hour)
+            return time.hour < other.time.hour;
+        return time.minute < other.time.minute;
+    }
+    bool operator==(const AccurateTime &other) const
+    {
+        return date == other.date && time.hour == other.time.hour && time.minute == other.time.minute;
+    }
+    bool operator!=(const AccurateTime &other) const { return !(*this == other); }
+    bool operator<=(const AccurateTime &other) const { return *this < other || *this == other; }
+    bool operator>(const AccurateTime &other) const { return !(*this <= other); }
+    bool operator>=(const AccurateTime &other) const { return !(*this < other); }
+    int operator-(const AccurateTime &other) const
+    {
+        int day_diff = (date.month - other.date.month) * 30 + (date.day - other.date.day);
+        int time_diff = (time.hour - other.time.hour) * 60 + (time.minute - other.time.minute);
+        return day_diff * 1440 + time_diff;
     }
 };
 #endif // TIME_HPP

@@ -1,8 +1,8 @@
 #ifndef BUFFERPOOLMANAGER_HPP
 #define BUFFERPOOLMANAGER_HPP
-#include "BPT_MemoryRiver.hpp"
 #include "../Library/list.hpp"
 #include "../Library/unordered_map.hpp"
+#include "BPT_MemoryRiver.hpp"
 template<class Page>
 class BufferPoolManager
 {
@@ -15,8 +15,6 @@ private:
         bool is_deleted = false;
     };
 
-    int &root_pos;
-
     int capacity;
 
     // LRU：head : most recently used, tail : least recently used
@@ -28,7 +26,7 @@ private:
     MemoryRiver<Page> &disk;
 
 public:
-    BufferPoolManager(int cap, MemoryRiver<Page> &mr, int &root) : capacity(cap), disk(mr), root_pos(root) {}
+    BufferPoolManager(int cap, MemoryRiver<Page> &mr) : capacity(cap), disk(mr) {}
 
     Page &get(int page_id)
     {
@@ -104,17 +102,13 @@ public:
         return pos;
     }
 
-    void evict()
+    virtual void evict()
     {
         auto it = lru.end();
 
         while (it != lru.begin())
         {
             --it;
-
-            if (it->page_id == root_pos)
-                continue;
-
             if (it->dirty && !it->is_deleted)
                 disk.update(it->page, it->page_id);
 
@@ -137,7 +131,7 @@ public:
             {
                 disk.Delete(it->page_id);
                 page_table.erase(it->page_id);
-                it = lru.erase(it); 
+                it = lru.erase(it);
             }
             else
             {
@@ -151,5 +145,38 @@ public:
         }
     }
     ~BufferPoolManager() { flush_all(); }
+};
+template<class Page>
+class BufferPoolManagerForBPT : public BufferPoolManager<Page>
+{
+private:
+    int &root_pos;
+
+public:
+    BufferPoolManagerForBPT(int cap, MemoryRiver<Page> &mr, int &root) : BufferPoolManager<Page>(cap, mr), root_pos(root) {}
+    void evict() override
+    {
+        auto it = this->lru.end();
+
+        while (it != this->lru.begin())
+        {
+            --it;
+
+            if (it->page_id == root_pos)
+                continue;
+
+            if (it->dirty && !it->is_deleted)
+                this->disk.update(it->page, it->page_id);
+
+            if (it->is_deleted)
+                this->disk.Delete(it->page_id);
+
+            this->page_table.erase(it->page_id);
+            this->lru.erase(it);
+            return;
+        }
+
+        throw std::runtime_error("no evictable page");
+    }
 };
 #endif // BUFFERPOOLMANAGER_HPP
