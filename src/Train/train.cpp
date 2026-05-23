@@ -544,6 +544,9 @@ std::string TrainManager::handleTrainCommand(TokenStream &tokens)
     std::string sale_date;
     std::string type;
     std::string query_date;
+    std::string from;
+    std::string to;
+    std::string priority;
 
     const Token *cmd_token = tokens.get();
     if (cmd_token == nullptr)
@@ -640,6 +643,44 @@ std::string TrainManager::handleTrainCommand(TokenStream &tokens)
                 param_token = tokens.get();
             }
             return queryTrain(train_id, query_date);
+        }
+        case QUERYTICKET: {
+            if (tokens.size() < 4 || tokens.size() > 5)
+                return "-1";
+            const Token *param_token = tokens.get();
+            while (param_token != nullptr)
+            {
+                if (param_token->type == STARTPLACE)
+                    from = param_token->text;
+                else if (param_token->type == DESTINATION)
+                    to = param_token->text;
+                else if (param_token->type == QUERYDATE)
+                    query_date = param_token->text;
+                else if (param_token->type == PRIORITY)
+                    priority = param_token->text;
+                else
+                    return "-1";
+            }
+            return queryTicket(from, to, query_date, priority);
+        }
+        case QUERYTRANSFER: {
+            if (tokens.size() < 4 || tokens.size() > 5)
+                return "-1";
+            const Token *param_token = tokens.get();
+            while (param_token != nullptr)
+            {
+                if (param_token->type == STARTPLACE)
+                    from = param_token->text;
+                else if (param_token->type == DESTINATION)
+                    to = param_token->text;
+                else if (param_token->type == QUERYDATE)
+                    query_date = param_token->text;
+                else if (param_token->type == PRIORITY)
+                    priority = param_token->text;
+                else
+                    return "-1";
+            }
+            return queryTransfer(from, to, query_date, priority);
         }
         default:
             return "-1";

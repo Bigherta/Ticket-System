@@ -4,6 +4,7 @@
 #include <cstring>
 #include "../BPlusTree/BPT.hpp"
 #include "../BPlusTree/BPT_MemoryRiver.hpp"
+#include "../Library/string_key.hpp"
 #include "../Grammar/Token.hpp"
 #include "../Library/set.hpp"
 #include "../Library/vector.hpp"
@@ -149,8 +150,8 @@ public:
     void clean();
 
 private:
-    BPT<char[21], int> trainIndex;
-    BPT<char[41], sjtu::pair<int, int>> station_train_mapping;
+    BPT<sjtu::StringKey<21>, int> trainIndex;
+    BPT<sjtu::StringKey<41>, sjtu::pair<int, int>> station_train_mapping;
     struct SeatStatus
     {
         int train_addr;

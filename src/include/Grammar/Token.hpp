@@ -48,6 +48,7 @@ enum TokenType
     STARTPLACE, ///< 出发地参数
     DESTINATION, ///< 目的地参数
     PRIORITY, ///< 优先级参数
+    INQUEUE, ///< 是否加入候补参数
     NUMBER, ///< 数量参数
     WAITING, ///< 候补参数
 

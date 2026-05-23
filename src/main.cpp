@@ -2,6 +2,7 @@
 #include "include/Grammar/parser.hpp"
 #include "include/User/user.hpp"
 #include "include/Train/train.hpp"
+#include "include/Order/order.hpp"
 /**
  * @brief 程序入口
  *
@@ -14,6 +15,7 @@ int main()
     std::cin.tie(nullptr);
     Parser parser; // 指令解析器
     UserManager userManager; // 用户管理器
+    OrderManager orderManager(userManager); // 订单管理器
     TrainManager trainManager; // 列车管理器
     std::string line; // 存储用户输入的一行指令
 
@@ -22,7 +24,7 @@ int main()
     {
         bool is_running = true;
 
-        std::string output = parser.execute(line, userManager, trainManager, is_running);
+        std::string output = parser.execute(line, userManager, trainManager, orderManager, is_running);
         if (!output.empty())
         {
             std::cout << output << '\n';

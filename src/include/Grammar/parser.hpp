@@ -4,8 +4,9 @@
 
 #include <string>
 #include "../Library/unordered_map.hpp"
-#include "../User/user.hpp"
 #include "../Train/train.hpp"
+#include "../User/user.hpp"
+#include "../Order/order.hpp"
 #include "Token.hpp"
 
 
@@ -54,7 +55,7 @@ public:
      * @param line 输入指令行
      * @return 解析后的 TokenStream
      */
-    TokenStream tokenize(std::string &result, const std::string &line) const;
+    TokenStream tokenize(std::string &result, const std::string &line_raw, int &time_stamp) const;
 
 
     /**
@@ -72,6 +73,6 @@ public:
      * @param is_running 程序运行状态标志
      * @return 执行结果字符串（如有需要），否则返回空字符串
      */
-    std::string execute(const std::string &, UserManager &, TrainManager &, bool &is_running);
+    std::string execute(const std::string &, UserManager &, TrainManager &, OrderManager &, bool &is_running);
 };
 #endif

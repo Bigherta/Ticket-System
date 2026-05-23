@@ -5,6 +5,7 @@
 #include "../Grammar/Token.hpp"
 #include "../Library/set.hpp"
 class UserManager;
+class OrderManager;
 class User
 {
     friend class UserManager;
@@ -64,6 +65,7 @@ public:
 };
 class UserManager
 {
+    friend class OrderManager;
 public:
     /**
      * @brief 构造函数，初始化 UserManager 对象

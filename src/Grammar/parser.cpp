@@ -34,7 +34,7 @@ TokenType Parser::matchkeyword(ParserState state, const std::string &text) const
 }
 
 // 解析一行输入，将输入行分割成 tokens
-TokenStream Parser::tokenize(std::string &result, const std::string &line_raw) const
+TokenStream Parser::tokenize(std::string &result, const std::string &line_raw, int &time_stamp) const
 {
     // 支持行首可选的时间戳格式 [<timestamp>]
     std::string line = line_raw;
@@ -44,6 +44,7 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw) c
         if (pos != std::string::npos)
         {
             result = line.substr(0, pos + 1); // 提取时间戳
+            time_stamp = std::stoi(line.substr(1, pos - 1)); // 将时间戳字符串转换为整数
             result += " "; // 格式化处理时间戳
             line = line.substr(pos + 1);
         }
@@ -97,7 +98,8 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw) c
 }
 
 // 执行指令的主函数
-std::string Parser::execute(const std::string &line_raw, UserManager &userManager, TrainManager &trainManager, bool &is_running)
+std::string Parser::execute(const std::string &line_raw, UserManager &userManager, TrainManager &trainManager,
+                            OrderManager &orderManager, bool &is_running)
 {
     std::string line = line_raw;
     std::string result;
@@ -106,7 +108,8 @@ std::string Parser::execute(const std::string &line_raw, UserManager &userManage
     while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
         line.pop_back();
 
-    TokenStream tokens_ = tokenize(result, line);
+    int time_stamp; // 可选的时间戳处理
+    TokenStream tokens_ = tokenize(result, line, time_stamp);
     if (tokens_.size() == 0)
         return "";
 
@@ -122,11 +125,32 @@ std::string Parser::execute(const std::string &line_raw, UserManager &userManage
         result += userManager.handleUserCommand(tokens_);
     }
 
-    if (State(cmd) == ParserState::TRAINCMD || cmd == QUERYTRAIN)
+    else if (State(cmd) == ParserState::TRAINCMD || cmd == QUERYTRAIN || cmd == QUERYTICKET || cmd == QUERYTRANSFER)
     {
         // 处理列车相关指令
         result += trainManager.handleTrainCommand(tokens_);
     }
+    else if (State(cmd) == ParserState::TICKETCMD)
+    {
+        // 处理购票相关指令
+        result += orderManager.handleOrderCommand(tokens_, trainManager, time_stamp);
+    }
+    else if (cmd == CLEAN)
+    {
+        // 处理清除数据指令
+        userManager.clean();
+        trainManager.clean();
+        orderManager.clean();
+        result += "0";
+    }
+    else if (cmd == EXIT)
+    {
+        // 处理退出指令
+        userManager.exit();
+        is_running = false;
+        result += "bye";
+    }
+
     return result;
 }
 
@@ -174,11 +198,12 @@ struct ParserStaticInit
         Parser::TRAINCOMMANDTABLE.insert({"-d", SALEDATE});
         Parser::TRAINCOMMANDTABLE.insert({"-y", TRAINTYPE});
 
+        Parser::TICKETCOMMANDTABLE.insert({"-u", USERNAME});
         Parser::TICKETCOMMANDTABLE.insert({"-i", TRAINID});
         Parser::TICKETCOMMANDTABLE.insert({"-d", QUERYDATE});
         Parser::TICKETCOMMANDTABLE.insert({"-s", STARTPLACE});
         Parser::TICKETCOMMANDTABLE.insert({"-t", DESTINATION});
-        Parser::TICKETCOMMANDTABLE.insert({"-p", PRIORITY});
+        Parser::TICKETCOMMANDTABLE.insert({"-p", INQUEUE});
         Parser::TICKETCOMMANDTABLE.insert({"-n", NUMBER});
         Parser::TICKETCOMMANDTABLE.insert({"-f", STARTPLACE});
         Parser::TICKETCOMMANDTABLE.insert({"-q", WAITING});

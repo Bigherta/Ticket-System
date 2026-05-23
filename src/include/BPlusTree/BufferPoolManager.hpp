@@ -6,7 +6,7 @@
 template<class Page>
 class BufferPoolManager
 {
-private:
+protected:
     struct Frame
     {
         int page_id;
@@ -144,7 +144,7 @@ public:
             }
         }
     }
-    ~BufferPoolManager() { flush_all(); }
+    virtual ~BufferPoolManager() { flush_all(); }
 };
 template<class Page>
 class BufferPoolManagerForBPT : public BufferPoolManager<Page>

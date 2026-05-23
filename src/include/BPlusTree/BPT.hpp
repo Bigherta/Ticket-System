@@ -439,7 +439,7 @@ public:
         BPTree.get_info(root_pos, 1);
         BPTree.get_info(tree_size, 2);
 
-        bufferPool = new BufferPoolManager<Node<order>>(1000, BPTree, root_pos);
+        bufferPool = new BufferPoolManagerForBPT<Node<order>>(1000, BPTree, root_pos);
     }
     ~BPT()
     {
@@ -524,7 +524,7 @@ public:
         // Node underflow, need to merge with sibling
         merge(node, trace_index, node_pos);
     }
-    sjtu::vector<Value> visit(const Key &key)
+    sjtu::vector<Value> visit(const Key &key) const
     {
         sjtu::vector<Value> result;
         if (tree_size == 0)
