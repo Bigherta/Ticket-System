@@ -61,7 +61,7 @@ private:
             next = -1;
         }
     };
-    int root_pos = 2 * sizeof(int); // position of the root node in the file
+    int root_pos = 3 * sizeof(int); // position of the root node in the file
     int tree_size = 0; // number of nodes in the tree
     MemoryRiver<Node<order>> BPTree;
     BufferPoolManagerForBPT<Node<order>> *bufferPool;
@@ -618,7 +618,7 @@ public:
     {
         BPTree.clear();
         tree_size = 0;
-        root_pos = 2 * sizeof(int);
+        root_pos = 3 * sizeof(int);
     }
     class iterator
     {

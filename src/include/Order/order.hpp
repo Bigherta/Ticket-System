@@ -2,7 +2,6 @@
 #define ORDER_HPP
 #include <string>
 #include "../BPlusTree/BPT.hpp"
-#include "../BPlusTree/BPT_MemoryRiver.hpp"
 #include "../Grammar/Token.hpp"
 #include "../Library/string_key.hpp"
 #include "../Train/time.hpp"
@@ -74,7 +73,6 @@ private:
     BPT<int, int> waiting_orders; // orders in the queue, sorted by timestamp
     UserManager &user_manager;
     int accumulated_time = 0;
-    MemoryRiver<int> order_memory_river;
     MemoryRiver<Order> order_info_memory_river;
     BufferPoolManager<Order> *order_buffer_pool;
 
@@ -82,8 +80,7 @@ public:
     OrderManager(UserManager &user_manager) :
         user_order_map("user_order_bpt"), waiting_orders("waiting_orders"), user_manager(user_manager)
     {
-        order_memory_river.initialise("order_memory_river");
-        order_memory_river.get_info(accumulated_time, 1);
+        order_info_memory_river.get_info(accumulated_time, 1);
         order_info_memory_river.initialise("order_info_memory_river");
         order_buffer_pool = new BufferPoolManager<Order>(500, order_info_memory_river);
     }
@@ -127,14 +124,13 @@ public:
     {
         user_order_map.clear();
         waiting_orders.clear();
-        order_memory_river.clear();
         order_info_memory_river.clear();
     }
 
     void update_accumulated_time(int timestamp)
     {
         accumulated_time += timestamp;
-        order_memory_river.write_info(accumulated_time, 1);
+        order_info_memory_river.write_info(accumulated_time, 1);
     }
 };
 #endif // ORDER_HPP

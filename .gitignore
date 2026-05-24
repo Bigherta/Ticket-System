@@ -1,5 +1,5 @@
-build
 data
 .venv
 scripts
 timestamp_input
+build

@@ -109,11 +109,16 @@ public:
         while (it != lru.begin())
         {
             --it;
-            if (it->dirty && !it->is_deleted)
-                disk.update(it->page, it->page_id);
-
+            // Deleted pages have already been freed on disk by Delete().
             if (it->is_deleted)
-                disk.Delete(it->page_id);
+            {
+                page_table.erase(it->page_id);
+                lru.erase(it);
+                return;
+            }
+
+            if (it->dirty)
+                disk.update(it->page, it->page_id);
 
             page_table.erase(it->page_id);
             lru.erase(it);
@@ -129,7 +134,7 @@ public:
         {
             if (it->is_deleted)
             {
-                disk.Delete(it->page_id);
+                // Already freed on disk; just drop from buffer pool.
                 page_table.erase(it->page_id);
                 it = lru.erase(it);
             }
@@ -165,11 +170,16 @@ public:
             if (it->page_id == root_pos)
                 continue;
 
-            if (it->dirty && !it->is_deleted)
-                this->disk.update(it->page, it->page_id);
-
+            // Deleted pages have already been freed on disk by Delete().
             if (it->is_deleted)
-                this->disk.Delete(it->page_id);
+            {
+                this->page_table.erase(it->page_id);
+                this->lru.erase(it);
+                return;
+            }
+
+            if (it->dirty)
+                this->disk.update(it->page, it->page_id);
 
             this->page_table.erase(it->page_id);
             this->lru.erase(it);
