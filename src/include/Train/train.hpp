@@ -156,7 +156,7 @@ private:
     struct SeatStatus
     {
         int train_addr;
-        char station[41]{};
+        int station_index;
         Date date;
         bool operator<(const SeatStatus &other) const
         {
@@ -164,11 +164,11 @@ private:
                 return train_addr < other.train_addr;
             if (date != other.date)
                 return date < other.date;
-            return std::strcmp(station, other.station) < 0;
+            return station_index < other.station_index;
         }
         bool operator==(const SeatStatus &other) const
         {
-            return train_addr == other.train_addr && date == other.date && std::strcmp(station, other.station) == 0;
+            return train_addr == other.train_addr && date == other.date && station_index == other.station_index;
         }
         bool operator!=(const SeatStatus &other) const { return !(*this == other); }
         bool operator<=(const SeatStatus &other) const { return !(other < *this); }

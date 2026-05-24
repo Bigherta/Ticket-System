@@ -1,4 +1,3 @@
-
 #include "../include/Train/train.hpp"
 #include <cstdio>
 #include <cstring>
@@ -149,8 +148,7 @@ std::string TrainManager::releaseTrain(const std::string &train_id)
             AccurateTime depart_time = start_time + temp.depart_time_offset[i];
             SeatStatus key{};
             key.train_addr = pos_list[0];
-            std::strncpy(key.station, temp.stations[i], 40);
-            key.station[40] = '\0';
+            key.station_index = i;
             key.date = depart_time.date;
             seat_manager.insert(key, temp.total_seat_num);
         }
@@ -215,8 +213,7 @@ std::string TrainManager::queryTrain(const std::string &train_id, const std::str
             {
                 SeatStatus key{};
                 key.train_addr = pos_list[0];
-                std::strncpy(key.station, targetTrain.stations[i], 40);
-                key.station[40] = '\0';
+                key.station_index = i;
                 key.date = depart_time.date;
                 auto seat_list = seat_manager.visit(key);
                 if (!seat_list.empty())
@@ -305,8 +302,7 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
                         route.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
                 SeatStatus key{};
                 key.train_addr = from_entry.first;
-                std::strncpy(key.station, train.stations[i], 40);
-                key.station[40] = '\0';
+                key.station_index = i;
                 key.date = segment_depart.date;
                 auto seat_list = seat_manager.visit(key);
                 if (!seat_list.empty() && seat_list[0] < seat_left)
@@ -393,8 +389,7 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
                     from_depart + (train.depart_time_offset[i] - train.depart_time_offset[from_idx]);
             SeatStatus key{};
             key.train_addr = train_addr;
-            std::strncpy(key.station, train.stations[i], 40);
-            key.station[40] = '\0';
+            key.station_index = i;
             key.date = segment_depart.date;
             auto seat_list = seat_manager.visit(key);
             if (!seat_list.empty() && seat_list[0] < seat_left)
