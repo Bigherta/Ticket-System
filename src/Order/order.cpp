@@ -13,6 +13,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     }
     auto train_index = train_index_vec[0];
     auto train = train_manager.trainBufferPool->get(train_index);
+    // validate train release status
+    if (!train.is_released)
+        return "-1";
     // validate requested number
     if (num <= 0)
     {
@@ -32,11 +35,16 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     }
     if (from_index == -1 || to_index == -1 || from_index >= to_index)
         return "-1";
-
+    AccurateTime earliest = AccurateTime(train.start_date, train.start_time) + train.depart_time_offset[from_index];
+    AccurateTime latest = AccurateTime(train.end_date, train.start_time) + train.depart_time_offset[from_index];
+    Date query_d(date);
+    if (query_d < earliest.date || latest.date < query_d)
+        return "-1";
     int depart_minutes =
             (train.start_time.hour * 60 + train.start_time.minute + train.depart_time_offset[from_index]) % 1440;
     Time depart_clock(depart_minutes / 60, depart_minutes % 60);
     AccurateTime from_depart(Date(date), depart_clock);
+    int travel_minutes = train.arrive_time_offset[to_index] - train.depart_time_offset[from_index];
 
     int min_seat = train.total_seat_num;
     for (int i = from_index; i < to_index; ++i)
@@ -48,13 +56,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
         std::sprintf(key.station, "%s", train.stations[i]);
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
-        if (seat_list.empty())
-        {
-            min_seat = 0;
-            break;
-        }
-        if (seat_list[0] < min_seat)
-            min_seat = seat_list[0];
+        int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
+        if (seat_left < min_seat)
+            min_seat = seat_left;
     }
     if (min_seat < num)
     {
@@ -71,10 +75,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
             std::sprintf(order.from, "%s", from.c_str());
             std::sprintf(order.to, "%s", to.c_str());
             order.depart_time = from_depart;
-            int arrive_minutes =
-                    (depart_minutes + train.arrive_time_offset[to_index] - train.depart_time_offset[from_index]) % 1440;
+            int arrive_minutes = (depart_minutes + travel_minutes) % 1440;
             Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
-            order.arrive_time = from_depart + (arrive_clock - depart_clock);
+            order.arrive_time = from_depart + travel_minutes;
             int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index];
             order.price = train.prices_prefix[to_index] - start_price;
             order.num = num;
@@ -109,18 +112,17 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     std::sprintf(order.from, "%s", from.c_str());
     std::sprintf(order.to, "%s", to.c_str());
     order.depart_time = from_depart;
-    int arrive_minutes =
-            (depart_minutes + train.arrive_time_offset[to_index] - train.depart_time_offset[from_index]) % 1440;
+    int arrive_minutes = (depart_minutes + travel_minutes) % 1440;
     Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
-    order.arrive_time = from_depart + (arrive_clock - depart_clock);
+    order.arrive_time = from_depart + travel_minutes;
     int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index];
-    order.price = (long long)(train.prices_prefix[to_index] - start_price) * (long long)num;
+    order.price = train.prices_prefix[to_index] - start_price;
     order.num = num;
     order.state = orderState::SUCCESS;
     char username_c[21]{};
     std::sprintf(username_c, "%s", username.c_str());
     user_order_map.insert(username_c, order);
-    return std::to_string(order.price);
+    return std::to_string((long long) order.price * (long long) num);
 }
 
 std::string OrderManager::queryOrder(const std::string &username) const
@@ -140,7 +142,8 @@ std::string OrderManager::queryOrder(const std::string &username) const
     for (int i = (int) order_list.size() - 1; i >= 0; --i)
     {
         res += std::string(order_list[i]);
-        res += "\n";
+        if (i != 0)
+            res += "\n";
     }
     return res;
 }
@@ -198,9 +201,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
         std::sprintf(key.station, "%s", train.stations[i]);
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
-        if (seat_list.empty())
-            continue;
-        int seat_left = seat_list[0];
+        int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
         train_manager.seat_manager.remove(key, seat_left);
         train_manager.seat_manager.insert(key, seat_left + number);
     }
@@ -246,13 +247,9 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
             std::sprintf(key.station, "%s", train.stations[i]);
             key.date = segment_depart.date;
             auto seat_list = train_manager.seat_manager.visit(key);
-            if (seat_list.empty())
-            {
-                min_seat = 0;
-                break;
-            }
-            if (seat_list[0] < min_seat)
-                min_seat = seat_list[0];
+            int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
+            if (seat_left < min_seat)
+                min_seat = seat_left;
         }
 
         if (min_seat >= w_order.num)
@@ -267,7 +264,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                 std::sprintf(key.station, "%s", train.stations[i]);
                 key.date = segment_depart.date;
                 auto seat_list = train_manager.seat_manager.visit(key);
-                int seat_left = seat_list[0];
+                int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
                 train_manager.seat_manager.remove(key, seat_left);
                 train_manager.seat_manager.insert(key, seat_left - w_order.num);
             }
