@@ -620,5 +620,68 @@ public:
         tree_size = 0;
         root_pos = 2 * sizeof(int);
     }
+    class iterator
+    {
+    private:
+        int index;
+        BPT *tree;
+        Node<order> *node;
+
+    public:
+        iterator(int index, BPT *tree, Node<order> *node) : index(index), tree(tree), node(node) {}
+        ~iterator() = default;
+        iterator &operator++()
+        {
+            if (index < node->size - 1)
+            {
+                ++index;
+            }
+            else
+            {
+                if (node->next == -1)
+                {
+                    index = -1; // end iterator
+                    node = nullptr;
+                    return *this;
+                }
+                node = &tree->bufferPool->get(node->next);
+                index = 0;
+            }
+            return *this;
+        }
+        auto operator*() -> sjtu::pair<Key, Value> &
+        {
+            return node->Keys[index];
+        }
+        bool operator==(const iterator &rhs) const
+        {
+            return node == rhs.node && index == rhs.index && tree == rhs.tree;
+        }
+        bool operator!=(const iterator &rhs) const
+        {
+            return !(*this == rhs);
+        }
+        bool IsEnd() const
+        {
+            return node == nullptr && index == -1;
+        }
+    };
+    iterator begin()
+    {
+        if (tree_size == 0)
+        {
+            return iterator(-1, this, nullptr);
+        }
+        Node<order> node = bufferPool->get(root_pos);
+        while (!node.isLeaf)
+        {
+            node = bufferPool->get(node.children[0]);
+        }
+        return iterator(0, this, &node);
+    }
+    iterator end()
+    {
+        return iterator(-1, this, nullptr);
+    }
 };
 #endif // BPT.hpp

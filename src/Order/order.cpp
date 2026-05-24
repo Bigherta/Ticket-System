@@ -88,8 +88,10 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
             order.state = orderState::PENDING;
             char username_c[21]{};
             std::sprintf(username_c, "%s", username.c_str());
-            user_order_map.insert(username_c, order);
-            waiting_orders.emplace(order);
+            int order_index = order_buffer_pool->new_page(order);
+            order_buffer_pool->put(order_index, order);
+            user_order_map.insert(username_c, {order_index, order.timestamp});
+            waiting_orders.insert(order.timestamp, order_index);
             return "queue";
         }
     }
@@ -125,7 +127,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     order.state = orderState::SUCCESS;
     char username_c[21]{};
     std::sprintf(username_c, "%s", username.c_str());
-    user_order_map.insert(username_c, order);
+    int order_index = order_buffer_pool->new_page(order);
+    order_buffer_pool->put(order_index, order);
+    user_order_map.insert(username_c, {order_index, order.timestamp});
     return std::to_string((long long) order.price * (long long) num);
 }
 
@@ -145,7 +149,8 @@ std::string OrderManager::queryOrder(const std::string &username) const
     res += "\n";
     for (int i = (int) order_list.size() - 1; i >= 0; --i)
     {
-        res += std::string(order_list[i]);
+        auto order = order_buffer_pool->get(order_list[i].order_index);
+        res += std::string(order);
         if (i != 0)
             res += "\n";
     }
@@ -166,17 +171,17 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
     {
         return "-1";
     }
-    auto order = order_list[order_index];
+    auto order_addr = order_list[order_index].order_index;
+    auto order = order_buffer_pool->get(order_addr);
     if (order.state == orderState::REFUNDED)
     {
         return "-1";
     }
     if (order.state == orderState::PENDING)
     {
-        user_order_map.remove(username_c, order);
         order.state = orderState::REFUNDED;
-        user_order_map.insert(username_c, order);
-        waiting_orders.erase(order);
+        order_buffer_pool->put(order_addr, order);
+        waiting_orders.remove(order.timestamp, order_addr);
         return "0";
     }
     auto start_place = order.from;
@@ -209,15 +214,13 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
         train_manager.seat_manager.remove(key, seat_left);
         train_manager.seat_manager.insert(key, seat_left + number);
     }
-
-    user_order_map.remove(username_c, order);
     order.state = orderState::REFUNDED;
-    user_order_map.insert(username_c, order);
-
+    order_buffer_pool->put(order_addr, order);
     // Check waiting orders
-    sjtu::vector<Order> fulfilled_orders;
-    for (const auto &w_order: waiting_orders)
+    sjtu::vector<sjtu::pair<int, Order>> fulfilled_orders;
+    for (const auto &iter: waiting_orders)
     {
+        const auto &w_order = order_buffer_pool->get(iter.second);
         if (std::strcmp(w_order.train_id, train_id) != 0)
             continue;
 
@@ -272,17 +275,17 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                 train_manager.seat_manager.remove(key, seat_left);
                 train_manager.seat_manager.insert(key, seat_left - w_order.num);
             }
-            fulfilled_orders.push_back(w_order);
+            fulfilled_orders.push_back({iter.second, w_order});
         }
     }
 
     for (size_t i = 0; i < fulfilled_orders.size(); ++i)
     {
-        Order w_order = fulfilled_orders[i];
-        waiting_orders.erase(w_order);
-        user_order_map.remove(w_order.username, w_order);
+        const auto &iter = fulfilled_orders[i];
+        Order w_order = iter.second;
+        waiting_orders.remove(w_order.timestamp, iter.first); // remove from waiting orders
         w_order.state = orderState::SUCCESS;
-        user_order_map.insert(w_order.username, w_order);
+        order_buffer_pool->put(iter.first, w_order); // update order state
     }
 
     return "0";

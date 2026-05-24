@@ -4,7 +4,6 @@
 #include "../BPlusTree/BPT.hpp"
 #include "../BPlusTree/BPT_MemoryRiver.hpp"
 #include "../Grammar/Token.hpp"
-#include "../Library/set.hpp"
 #include "../Library/string_key.hpp"
 #include "../Train/time.hpp"
 #include "../Train/train.hpp"
@@ -64,19 +63,31 @@ public:
 class OrderManager
 {
 private:
-    BPT<sjtu::StringKey<21>, Order> user_order_map;
+    struct OrderInfo
+    {
+        int order_index;
+        int timestamp;
+        bool operator<(const OrderInfo &other) const { return timestamp < other.timestamp; }
+        bool operator==(const OrderInfo &other) const { return timestamp == other.timestamp; }
+    };
+    BPT<sjtu::StringKey<21>, OrderInfo> user_order_map;
+    BPT<int, int> waiting_orders; // orders in the queue, sorted by timestamp
     UserManager &user_manager;
-    sjtu::set<Order> waiting_orders; // orders in the queue, sorted by timestamp
     int accumulated_time = 0;
     MemoryRiver<int> order_memory_river;
+    MemoryRiver<Order> order_info_memory_river;
+    BufferPoolManager<Order> *order_buffer_pool;
 
 public:
     OrderManager(UserManager &user_manager) :
-        user_order_map("user_order_bpt"), user_manager(user_manager), waiting_orders()
+        user_order_map("user_order_bpt"), waiting_orders("waiting_orders"), user_manager(user_manager)
     {
         order_memory_river.initialise("order_memory_river");
         order_memory_river.get_info(accumulated_time, 1);
+        order_info_memory_river.initialise("order_info_memory_river");
+        order_buffer_pool = new BufferPoolManager<Order>(500, order_info_memory_river);
     }
+    ~OrderManager() { delete order_buffer_pool; }
     /**
      * @brief Buy a ticket for a user
      * @param timestamp The timestamp of the order
@@ -117,6 +128,7 @@ public:
         user_order_map.clear();
         waiting_orders.clear();
         order_memory_river.clear();
+        order_info_memory_river.clear();
     }
 
     void update_accumulated_time(int timestamp)
