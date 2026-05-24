@@ -13,6 +13,15 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     }
     auto train_index = train_index_vec[0];
     auto train = train_manager.trainBufferPool->get(train_index);
+    // validate requested number
+    if (num <= 0)
+    {
+        return "-1"; // cannot buy non-positive number of tickets
+    }
+    if (num > train.total_seat_num)
+    {
+        return "-1"; // cannot queue or buy more than the train's total seat number
+    }
     int from_index = -1, to_index = -1;
     for (int i = 0; i < train.station_num; ++i)
     {
@@ -66,7 +75,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
                     (depart_minutes + train.arrive_time_offset[to_index] - train.depart_time_offset[from_index]) % 1440;
             Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
             order.arrive_time = from_depart + (arrive_clock - depart_clock);
-            int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index - 1];
+            int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index];
             order.price = train.prices_prefix[to_index] - start_price;
             order.num = num;
             order.state = orderState::PENDING;
@@ -104,7 +113,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
             (depart_minutes + train.arrive_time_offset[to_index] - train.depart_time_offset[from_index]) % 1440;
     Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
     order.arrive_time = from_depart + (arrive_clock - depart_clock);
-    int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index - 1];
+    int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index];
     order.price = (long long)(train.prices_prefix[to_index] - start_price) * (long long)num;
     order.num = num;
     order.state = orderState::SUCCESS;
@@ -284,7 +293,7 @@ std::string OrderManager::handleOrderCommand(TokenStream &tokens, TrainManager &
     std::string train_id;
     std::string query_date;
     std::string from;
-    int num;
+    int num = 0;
     std::string to;
     std::string in_queue;
 
@@ -330,6 +339,8 @@ std::string OrderManager::handleOrderCommand(TokenStream &tokens, TrainManager &
                 param_token = tokens.get();
             }
             bool added_into_queue = (in_queue == "true");
+            if (num <= 0)
+                return "-1"; // cannot buy non-positive number of tickets
             return BuyTicket(time_stamp, train_manager, username, train_id, query_date, from, to, num,
                              added_into_queue);
         }

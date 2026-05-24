@@ -206,6 +206,7 @@ struct ParserStaticInit
         Parser::TICKETCOMMANDTABLE.insert({"-q", INQUEUE});
         Parser::TICKETCOMMANDTABLE.insert({"-n", NUMBER});
         Parser::TICKETCOMMANDTABLE.insert({"-f", STARTPLACE});
+        Parser::TICKETCOMMANDTABLE.insert({"-p", PRIORITY});
     }
 };
 static ParserStaticInit parser_static_init_instance;

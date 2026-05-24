@@ -163,7 +163,7 @@ public:
             case STATIONNUM:
                 return num >= 2 && num <= 100; // Station number should be between 2 and 100
             case SEATNUM:
-                return num >= 0 && num <= 100000; // Seat number should be between 1 and 100000
+                return num >= 1 && num <= 100000; // Seat number should be between 1 and 100000 (no zero-seat trains)
             case PRICES:
                 return num >= 0 && num <= 100000; // Price should be between 1 and 100000
             case TRAVELTIMES:
