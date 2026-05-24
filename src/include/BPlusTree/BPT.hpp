@@ -672,12 +672,14 @@ public:
         {
             return iterator(-1, this, nullptr);
         }
-        Node<order> node = bufferPool->get(root_pos);
-        while (!node.isLeaf)
+        int cur = root_pos;
+        Node<order> *nodePtr = &bufferPool->get(cur);
+        while (!nodePtr->isLeaf)
         {
-            node = bufferPool->get(node.children[0]);
+            cur = nodePtr->children[0];
+            nodePtr = &bufferPool->get(cur);
         }
-        return iterator(0, this, &node);
+        return iterator(0, this, nodePtr);
     }
     iterator end()
     {

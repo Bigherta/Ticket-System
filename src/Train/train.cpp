@@ -14,10 +14,7 @@ TrainManager::TrainManager() :
     trainDatabase.initialise("trainDatabase.dat");
 }
 
-TrainManager::~TrainManager()
-{
-    delete trainBufferPool;
-}
+TrainManager::~TrainManager() { delete trainBufferPool; }
 
 std::string TrainManager::addTrain(const std::string &train_id, const std::string &station_num,
                                    const std::string &seat_num, const std::string &stations, const std::string &prices,
@@ -405,22 +402,22 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
         }
         return seat_left;
     };
-    for (const auto &entry: from_list)
+    for (const auto &from_entry: from_list)
     {
-        auto from_train = trainBufferPool->get(entry.first);
+        auto from_train = trainBufferPool->get(from_entry.first);
         AccurateTime earliest_depart_time = AccurateTime(from_train.start_date, from_train.start_time) +
-                                            from_train.depart_time_offset[entry.second];
-        AccurateTime latest_depart_time =
-                AccurateTime(from_train.end_date, from_train.start_time) + from_train.depart_time_offset[entry.second];
+                                            from_train.depart_time_offset[from_entry.second];
+        AccurateTime latest_depart_time = AccurateTime(from_train.end_date, from_train.start_time) +
+                                          from_train.depart_time_offset[from_entry.second];
         if (query_date < earliest_depart_time.date || latest_depart_time.date < query_date)
             continue; // train does not run on the given date
         int depart_minutes = (from_train.start_time.hour * 60 + from_train.start_time.minute +
-                              from_train.depart_time_offset[entry.second]) %
+                              from_train.depart_time_offset[from_entry.second]) %
                              1440;
         Time depart_clock(depart_minutes / 60, depart_minutes % 60);
         AccurateTime depart_time(query_date, depart_clock);
         sjtu::unordered_map<std::string, int> station_to_index;
-        for (int i = entry.second; i < from_train.station_num; ++i)
+        for (int i = from_entry.second + 1; i < from_train.station_num; ++i)
         {
             station_to_index[from_train.stations[i]] = i;
         }
@@ -429,12 +426,17 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
             auto to_train = trainBufferPool->get(to_entry.first);
             for (int i = 0; i < to_entry.second; ++i)
             {
-                if (to_entry.first != entry.first &&
+                if (to_entry.first != from_entry.first &&
                     station_to_index.find(to_train.stations[i]) != station_to_index.end())
                 {
                     int transfer_index = station_to_index[to_train.stations[i]];
+                    if (transfer_index <= from_entry.second)
+                        continue; // transfer station must be after departure station in from_train
+                    const char *from_station = from_train.stations[from_entry.second];
+                    const char *seg_station = to_train.stations[i];
+                    const char *to_station = to_train.stations[to_entry.second];
                     AccurateTime arrive_time = depart_time + (from_train.arrive_time_offset[transfer_index] -
-                                                              from_train.depart_time_offset[entry.second]);
+                                                              from_train.depart_time_offset[from_entry.second]);
                     AccurateTime to_earliest_depart_time =
                             AccurateTime(to_train.start_date, to_train.start_time) + to_train.depart_time_offset[i];
                     AccurateTime to_latest_depart_time =
@@ -452,11 +454,11 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
                         route.first_train_id[20] = '\0';
                         std::strncpy(route.second_train_id, to_train.train_id, 20);
                         route.second_train_id[20] = '\0';
-                        std::strncpy(route.from, from_train.stations[entry.second], 40);
+                        std::strncpy(route.from, from_station, 40);
                         route.from[40] = '\0';
-                        std::strncpy(route.transfer_station, to_train.stations[i], 40);
+                        std::strncpy(route.transfer_station, seg_station, 40);
                         route.transfer_station[40] = '\0';
-                        std::strncpy(route.to, to_train.stations[to_entry.second], 40);
+                        std::strncpy(route.to, to_station, 40);
                         route.to[40] = '\0';
                         route.first_depart_time = depart_time;
                         route.first_arrive_time = arrive_time;
@@ -466,11 +468,11 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
                                 (to_train.arrive_time_offset[to_entry.second] - to_train.depart_time_offset[i]);
                         route.total_time = route.second_arrive_time - route.first_depart_time;
                         route.price_first_train =
-                                from_train.prices_prefix[transfer_index] - from_train.prices_prefix[entry.second];
+                                from_train.prices_prefix[transfer_index] - from_train.prices_prefix[from_entry.second];
                         route.price_second_train = to_train.prices_prefix[to_entry.second] - to_train.prices_prefix[i];
                         route.total_price = route.price_first_train + route.price_second_train;
-                        route.seat_first_train =
-                                min_seat_for_leg(from_train, entry.first, entry.second, transfer_index, depart_time);
+                        route.seat_first_train = min_seat_for_leg(from_train, from_entry.first, from_entry.second,
+                                                                  transfer_index, depart_time);
                         route.seat_second_train =
                                 min_seat_for_leg(to_train, to_entry.first, i, to_entry.second, next_depart_time);
                     };

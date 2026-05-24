@@ -108,7 +108,7 @@ std::string Parser::execute(const std::string &line_raw, UserManager &userManage
     while (!line.empty() && (line.back() == '\r' || line.back() == '\n'))
         line.pop_back();
 
-    int time_stamp; // 可选的时间戳处理
+    int time_stamp = 0; // 可选的时间戳处理
     TokenStream tokens_ = tokenize(result, line, time_stamp);
     if (tokens_.size() == 0)
         return "";
