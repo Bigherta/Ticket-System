@@ -8,7 +8,7 @@
 
 TrainManager::TrainManager() :
     trainIndex("trainIndex.dat"), station_train_mapping("stationTrainMapping.dat"), seat_manager("seatManager.dat"),
-    trainBufferPool(new BufferPoolManager<Train>(100, trainDatabase))
+    trainBufferPool(new BufferPoolManager<Train>(500, trainDatabase))
 {
     trainDatabase.initialise("trainDatabase.dat");
 }
