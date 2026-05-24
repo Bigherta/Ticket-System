@@ -4,6 +4,10 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
                                     const std::string &train_id, const std::string &date, const std::string &from,
                                     const std::string &to, int num, bool added_into_queue)
 {
+    if (user_manager.logset.find(username) == user_manager.logset.end())
+    {
+        return "-1";
+    }
     char train_id_c[21]{};
     std::sprintf(train_id_c, "%s", train_id.c_str());
     auto train_index_vec = train_manager.trainIndex.visit(train_id_c);
