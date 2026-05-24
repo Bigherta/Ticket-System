@@ -203,10 +203,9 @@ struct ParserStaticInit
         Parser::TICKETCOMMANDTABLE.insert({"-d", QUERYDATE});
         Parser::TICKETCOMMANDTABLE.insert({"-s", STARTPLACE});
         Parser::TICKETCOMMANDTABLE.insert({"-t", DESTINATION});
-        Parser::TICKETCOMMANDTABLE.insert({"-p", INQUEUE});
+        Parser::TICKETCOMMANDTABLE.insert({"-q", INQUEUE});
         Parser::TICKETCOMMANDTABLE.insert({"-n", NUMBER});
         Parser::TICKETCOMMANDTABLE.insert({"-f", STARTPLACE});
-        Parser::TICKETCOMMANDTABLE.insert({"-q", WAITING});
     }
 };
 static ParserStaticInit parser_static_init_instance;

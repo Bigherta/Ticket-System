@@ -50,7 +50,6 @@ enum TokenType
     PRIORITY, ///< 优先级参数
     INQUEUE, ///< 是否加入候补参数
     NUMBER, ///< 数量参数
-    WAITING, ///< 候补参数
 
     CLEAN, ///< 清除数据指令
     EXIT, ///< 退出指令

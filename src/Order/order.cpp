@@ -66,7 +66,8 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
                     (depart_minutes + train.arrive_time_offset[to_index] - train.depart_time_offset[from_index]) % 1440;
             Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
             order.arrive_time = from_depart + (arrive_clock - depart_clock);
-            order.price = train.prices_prefix[to_index] - train.prices_prefix[from_index - 1];
+            int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index - 1];
+            order.price = train.prices_prefix[to_index] - start_price;
             order.num = num;
             order.state = orderState::PENDING;
             char username_c[21]{};
@@ -103,13 +104,14 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
             (depart_minutes + train.arrive_time_offset[to_index] - train.depart_time_offset[from_index]) % 1440;
     Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
     order.arrive_time = from_depart + (arrive_clock - depart_clock);
-    order.price = train.prices_prefix[to_index] - train.prices_prefix[from_index - 1];
+    int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index - 1];
+    order.price = train.prices_prefix[to_index] - start_price;
     order.num = num;
     order.state = orderState::SUCCESS;
     char username_c[21]{};
     std::sprintf(username_c, "%s", username.c_str());
     user_order_map.insert(username_c, order);
-    return std::to_string(train.prices_prefix[to_index] - train.prices_prefix[from_index - 1]);
+    return std::to_string(order.price);
 }
 
 std::string OrderManager::queryOrder(const std::string &username) const
