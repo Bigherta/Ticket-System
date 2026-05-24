@@ -4,7 +4,6 @@
 #include "../Library/vector.hpp"
 #include "BPT_MemoryRiver.hpp"
 #include "BufferPoolManager.hpp"
-constexpr int order = 48;
 template<class T>
 inline int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
@@ -33,11 +32,13 @@ inline int BinarySearch(const sjtu::pair<Key, Value> arr[], int size, const Key 
     }
     return left;
 }
+constexpr int PAGE_SIZE = 4096;
 template<class Key, class Value>
 class BPT
 {
 private:
     // Standard definition: order = maximum children count of an internal node.
+    static const int order = (PAGE_SIZE - 32) / (sizeof(sjtu::pair<Key, Value>) + sizeof(int));
     static constexpr int max_children = order;
     static constexpr int max_keys = max_children - 1;
     static constexpr int min_children_non_root_internal = (max_children + 1) / 2; // ceil(m / 2)
@@ -649,22 +650,13 @@ public:
             }
             return *this;
         }
-        auto operator*() -> sjtu::pair<Key, Value> &
-        {
-            return node->Keys[index];
-        }
+        auto operator*() -> sjtu::pair<Key, Value> & { return node->Keys[index]; }
         bool operator==(const iterator &rhs) const
         {
             return node == rhs.node && index == rhs.index && tree == rhs.tree;
         }
-        bool operator!=(const iterator &rhs) const
-        {
-            return !(*this == rhs);
-        }
-        bool IsEnd() const
-        {
-            return node == nullptr && index == -1;
-        }
+        bool operator!=(const iterator &rhs) const { return !(*this == rhs); }
+        bool IsEnd() const { return node == nullptr && index == -1; }
     };
     iterator begin()
     {
@@ -681,9 +673,6 @@ public:
         }
         return iterator(0, this, nodePtr);
     }
-    iterator end()
-    {
-        return iterator(-1, this, nullptr);
-    }
+    iterator end() { return iterator(-1, this, nullptr); }
 };
 #endif // BPT.hpp
