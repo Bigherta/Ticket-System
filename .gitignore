@@ -1,5 +1,5 @@
 build
 data
 .venv
-fix_data_timestamps.py
-run_tests.py
+scripts
+timestamp_input

@@ -147,6 +147,7 @@ std::string Parser::execute(const std::string &line_raw, UserManager &userManage
     {
         // 处理退出指令
         userManager.exit();
+        orderManager.update_accumulated_time(time_stamp);
         is_running = false;
         result += "bye";
     }

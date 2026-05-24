@@ -4,10 +4,6 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
                                     const std::string &train_id, const std::string &date, const std::string &from,
                                     const std::string &to, int num, bool added_into_queue)
 {
-    if (user_manager.logset.find(username) == user_manager.logset.end())
-    {
-        return "-1";
-    }
     char train_id_c[21]{};
     std::sprintf(train_id_c, "%s", train_id.c_str());
     auto train_index_vec = train_manager.trainIndex.visit(train_id_c);
@@ -73,7 +69,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
         else
         {
             Order order{};
-            order.timestamp = timestamp;
+            order.timestamp = accumulated_time + timestamp;
             std::sprintf(order.username, "%s", username.c_str());
             std::sprintf(order.train_id, "%s", train_id.c_str());
             std::sprintf(order.from, "%s", from.c_str());
@@ -110,7 +106,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
         train_manager.seat_manager.insert(key, seat_left);
     }
     Order order{};
-    order.timestamp = timestamp;
+    order.timestamp = accumulated_time + timestamp;
     std::sprintf(order.username, "%s", username.c_str());
     std::sprintf(order.train_id, "%s", train_id.c_str());
     std::sprintf(order.from, "%s", from.c_str());
