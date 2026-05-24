@@ -71,7 +71,7 @@ class OrderManager
     UserManager &user_manager;
     sjtu::set<Order> waiting_orders; // orders in the queue, sorted by timestamp
     public:
-    OrderManager(UserManager &user_manager) : user_manager(user_manager) {}
+    OrderManager(UserManager &user_manager) : user_order_map("user_order_bpt"), user_manager(user_manager), waiting_orders() {}
     /**
      * @brief Buy a ticket for a user
      * @param timestamp The timestamp of the order

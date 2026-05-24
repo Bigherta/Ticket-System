@@ -434,7 +434,7 @@ namespace sjtu
                 data = newdata;
             }
 
-            for (size_t i = length; i > index; --i)
+            for (size_t i = length; i > size_t(index); --i)
             {
                 new (data + i) T(std::move(data[i - 1]));
             }
@@ -468,7 +468,7 @@ namespace sjtu
         iterator erase(iterator pos) noexcept
         {
             int index = pos - begin();
-            if (index < length - 1)
+            if (size_t(index) < length - 1)
             {
                 for (size_t i = index; i < length - 1; ++i)
                 {
@@ -477,7 +477,7 @@ namespace sjtu
             }
             data[length - 1].~T();
             --length;
-            return (index >= length) ? end() : iterator(data + index, this);
+            return (size_t(index) >= length) ? end() : iterator(data + index, this);
         }
         /**
          * removes the element with index ind.

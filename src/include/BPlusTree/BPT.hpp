@@ -70,7 +70,6 @@ private:
         int left_size = order / 2; // number of keys to keep in the left node
         int right_size = node.size - left_size;
         int new_node_pos;
-        bool is_parent_split = false;
         // Create new node and move the right half of the keys to it
         Node<order> newNode;
         newNode.isLeaf = node.isLeaf;

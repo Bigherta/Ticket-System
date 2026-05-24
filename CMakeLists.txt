@@ -16,7 +16,7 @@ file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
 add_executable(ticket_system ${SRC_FILES})
 
 target_include_directories(ticket_system PRIVATE
-	${CMAKE_SOURCE_DIR}/include
+	${CMAKE_SOURCE_DIR}/src/include
 )
 
 # Basic compiler warnings

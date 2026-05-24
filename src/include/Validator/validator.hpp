@@ -63,12 +63,11 @@ public:
     }
     static int chinese_count(const std::string &str)
     {
-        int column = 0;
+        size_t column = 0;
         int count = 0;
         while (column < str.size())
         {
             int char_len = utf8_char_len((unsigned char) str[column]);
-            int start = 0;
             int code_point;
             switch (char_len)
             {

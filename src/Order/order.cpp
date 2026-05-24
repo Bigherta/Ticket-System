@@ -6,7 +6,12 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
 {
     char train_id_c[21]{};
     std::sprintf(train_id_c, "%s", train_id.c_str());
-    auto train_index = train_manager.trainIndex.visit(train_id_c)[0];
+    auto train_index_vec = train_manager.trainIndex.visit(train_id_c);
+    if (train_index_vec.empty())
+    {
+        return "-1";
+    }
+    auto train_index = train_index_vec[0];
     auto train = train_manager.trainBufferPool->get(train_index);
     int from_index = -1, to_index = -1;
     for (int i = 0; i < train.station_num; ++i)
@@ -16,6 +21,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
         if (std::strcmp(train.stations[i], to.c_str()) == 0)
             to_index = i;
     }
+    if (from_index == -1 || to_index == -1 || from_index >= to_index)
+        return "-1";
+
     int depart_minutes =
             (train.start_time.hour * 60 + train.start_time.minute + train.depart_time_offset[from_index]) % 1440;
     Time depart_clock(depart_minutes / 60, depart_minutes % 60);
@@ -256,7 +264,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
         }
     }
 
-    for (int i = 0; i < fulfilled_orders.size(); ++i)
+    for (size_t i = 0; i < fulfilled_orders.size(); ++i)
     {
         Order w_order = fulfilled_orders[i];
         waiting_orders.erase(w_order);
@@ -287,6 +295,7 @@ std::string OrderManager::handleOrderCommand(TokenStream &tokens, TrainManager &
         case BUYTICKET: {
             if (tokens.size() < 7 || tokens.size() > 8)
                 return "-1"; // 参数不足或过多
+            in_queue = "false"; // 默认不加入候补队列
             const Token *param_token = tokens.get();
             while (param_token != nullptr)
             {

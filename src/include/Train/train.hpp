@@ -75,6 +75,7 @@ public:
      * @brief 构造函数，初始化 TrainManager（载入/建立索引与数据库）
      */
     TrainManager();
+    ~TrainManager();
 
     /**
      * @brief 添加一列车次记录

@@ -4,7 +4,7 @@ TokenStream::TokenStream(sjtu::vector<Token> &&tokens) : tokens_(std::move(token
 
 const Token* TokenStream::peek() const
 {
-    if (cursor_ >= tokens_.size())
+    if (size_t(cursor_) >= tokens_.size())
     {
         return nullptr;
     }

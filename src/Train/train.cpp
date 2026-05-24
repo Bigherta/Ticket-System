@@ -8,12 +8,15 @@
 #include "../include/Validator/validator.hpp"
 
 TrainManager::TrainManager() :
-    trainIndex("trainIndex.dat"),
-    station_train_mapping("stationTrainMapping.dat"),
-    seat_manager("seatManager.dat"),
+    trainIndex("trainIndex.dat"), station_train_mapping("stationTrainMapping.dat"), seat_manager("seatManager.dat"),
     trainBufferPool(new BufferPoolManager<Train>(100, trainDatabase))
 {
     trainDatabase.initialise("trainDatabase.dat");
+}
+
+TrainManager::~TrainManager()
+{
+    delete trainBufferPool;
 }
 
 std::string TrainManager::addTrain(const std::string &train_id, const std::string &station_num,
@@ -252,9 +255,15 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
     auto from_list = station_train_mapping.visit(from_key);
     auto to_list = station_train_mapping.visit(to_key);
     if (from_list.empty() || to_list.empty())
+    {
+        if (time_queue)
+            delete time_queue;
+        if (price_queue)
+            delete price_queue;
         return "0"; // no train available
+    }
     sjtu::unordered_map<int, int> from_trains; // train_index -> index_in_from_list
-    for (int i = 0; i < from_list.size(); ++i)
+    for (size_t i = 0; i < from_list.size(); ++i)
     {
         from_trains.insert({from_list[i].first, i});
     }
@@ -461,9 +470,9 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
                         route.price_second_train = to_train.prices_prefix[to_entry.second] - to_train.prices_prefix[i];
                         route.total_price = route.price_first_train + route.price_second_train;
                         route.seat_first_train =
-                            min_seat_for_leg(from_train, entry.first, entry.second, transfer_index, depart_time);
+                                min_seat_for_leg(from_train, entry.first, entry.second, transfer_index, depart_time);
                         route.seat_second_train =
-                            min_seat_for_leg(to_train, to_entry.first, i, to_entry.second, next_depart_time);
+                                min_seat_for_leg(to_train, to_entry.first, i, to_entry.second, next_depart_time);
                     };
 
                     if (priority == "time")
@@ -647,6 +656,7 @@ std::string TrainManager::handleTrainCommand(TokenStream &tokens)
         case QUERYTICKET: {
             if (tokens.size() < 4 || tokens.size() > 5)
                 return "-1";
+            priority = "time"; // default priority
             const Token *param_token = tokens.get();
             while (param_token != nullptr)
             {
@@ -660,12 +670,14 @@ std::string TrainManager::handleTrainCommand(TokenStream &tokens)
                     priority = param_token->text;
                 else
                     return "-1";
+                param_token = tokens.get();
             }
             return queryTicket(from, to, query_date, priority);
         }
         case QUERYTRANSFER: {
             if (tokens.size() < 4 || tokens.size() > 5)
                 return "-1";
+            priority = "time"; // default priority
             const Token *param_token = tokens.get();
             while (param_token != nullptr)
             {
@@ -679,6 +691,7 @@ std::string TrainManager::handleTrainCommand(TokenStream &tokens)
                     priority = param_token->text;
                 else
                     return "-1";
+                param_token = tokens.get();
             }
             return queryTransfer(from, to, query_date, priority);
         }
