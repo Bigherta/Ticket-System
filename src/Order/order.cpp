@@ -57,7 +57,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
                 from_depart + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
         TrainManager::SeatStatus key{};
         key.train_addr = train_index;
-        std::sprintf(key.station, "%s", train.stations[i]);
+        key.station_index = i;
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
         int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
@@ -102,7 +102,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
                 from_depart + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
         TrainManager::SeatStatus key{};
         key.train_addr = train_index;
-        std::sprintf(key.station, "%s", train.stations[i]);
+        key.station_index = i;
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
         if (seat_list.empty())
@@ -207,7 +207,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                 order.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
         TrainManager::SeatStatus key{};
         key.train_addr = train_index;
-        std::sprintf(key.station, "%s", train.stations[i]);
+        key.station_index = i;
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
         int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
@@ -251,7 +251,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                     w_order.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[w_from_index]);
             TrainManager::SeatStatus key{};
             key.train_addr = train_index;
-            std::sprintf(key.station, "%s", train.stations[i]);
+                key.station_index = i;
             key.date = segment_depart.date;
             auto seat_list = train_manager.seat_manager.visit(key);
             int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
@@ -268,7 +268,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                         w_order.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[w_from_index]);
                 TrainManager::SeatStatus key{};
                 key.train_addr = train_index;
-                std::sprintf(key.station, "%s", train.stations[i]);
+                key.station_index = i;
                 key.date = segment_depart.date;
                 auto seat_list = train_manager.seat_manager.visit(key);
                 int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
