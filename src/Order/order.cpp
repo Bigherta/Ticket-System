@@ -105,7 +105,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     Time arrive_clock(arrive_minutes / 60, arrive_minutes % 60);
     order.arrive_time = from_depart + (arrive_clock - depart_clock);
     int start_price = (from_index == 0) ? 0 : train.prices_prefix[from_index - 1];
-    order.price = train.prices_prefix[to_index] - start_price;
+    order.price = (long long)(train.prices_prefix[to_index] - start_price) * (long long)num;
     order.num = num;
     order.state = orderState::SUCCESS;
     char username_c[21]{};

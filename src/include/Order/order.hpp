@@ -26,7 +26,7 @@ private:
     char to[41]{};
     AccurateTime depart_time;
     AccurateTime arrive_time;
-    int price;
+    long long price;
     int num;
     orderState state;
     operator std::string() const
