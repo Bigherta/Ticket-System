@@ -442,7 +442,7 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
                     AccurateTime to_latest_depart_time =
                             AccurateTime(to_train.end_date, to_train.start_time) + to_train.depart_time_offset[i];
                     AccurateTime next_depart_time(arrive_time.date, to_earliest_depart_time.time);
-                    if (next_depart_time < arrive_time)
+                    while (next_depart_time < arrive_time)
                         next_depart_time = next_depart_time + 1440;
                     if (next_depart_time < to_earliest_depart_time)
                         next_depart_time = to_earliest_depart_time;
