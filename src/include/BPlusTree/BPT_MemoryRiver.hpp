@@ -153,6 +153,13 @@ public:
 
     // 删除位置索引index对应的对象，保证调用的index都是由write函数产生
     void Delete(int index) { /* your code here */ free_index.push_back(index); }
+    void clear()
+    {
+        if (file.is_open())
+            file.close();
+        file.open(file_name, std::ios::out | std::ios::trunc | std::ios::binary);
+        file.close();
+    }
 };
 
 
