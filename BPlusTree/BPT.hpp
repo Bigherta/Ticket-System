@@ -337,7 +337,7 @@ private:
                         node.children[i] = node.children[i - 1];
                     node.Keys[0] = parentNode.Keys[index - 1];
                     node.children[0] = leftSibling.children[leftSibling.size];
-                    Node<order> moveNode = bufferPool->get(node.children[0], INDEX_TYPE );
+                    Node<order> moveNode = bufferPool->get(node.children[0], INDEX_TYPE);
                     moveNode.parent = node_pos;
                     bufferPool->put(node.children[0], moveNode, INDEX_TYPE);
                     parentNode.Keys[index - 1] = leftSibling.Keys[leftSibling.size - 1];
@@ -472,24 +472,112 @@ public:
         }
         else
         {
+            sjtu::vector<int> trace_index; // index of the child in the parent node
             Node<order> node = bufferPool->get(root_pos, LOOKUP_TYPE);
             int node_pos = root_pos;
             while (!node.isLeaf)
             {
                 // Keep order by (key, value) so duplicated keys with different values are all indexed.
                 int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
+                trace_index.push_back(child_index);
                 node_pos = node.children[child_index];
                 node = bufferPool->get(node_pos, INDEX_TYPE);
             }
             int insert_index = BinarySearch(node.Keys, node.size, keyValuePair);
-            for (int i = node.size; i > insert_index; --i)
-                node.Keys[i] = node.Keys[i - 1];
-            node.Keys[insert_index] = keyValuePair;
-            ++node.size;
-            if (node.size > max_keys) // node overflow, need to split
-                split(node, node_pos);
-            else
+            if (node.size < max_keys) // node has space, insert directly
+            {
+                for (int i = node.size; i > insert_index; --i)
+                    node.Keys[i] = node.Keys[i - 1];
+                node.Keys[insert_index] = keyValuePair;
+                ++node.size;
                 bufferPool->put(node_pos, node, SCAN_TYPE);
+                return;
+            }
+            else
+            {
+                if (trace_index.empty())
+                {
+                    for (int i = node.size; i > insert_index; --i)
+                        node.Keys[i] = node.Keys[i - 1];
+                    node.Keys[insert_index] = keyValuePair;
+                    ++node.size;
+                    split(node, node_pos);
+                }
+                else
+                {
+                    auto index = trace_index.back();
+                    auto &parentNode = bufferPool->get(node.parent, INDEX_TYPE);
+                    bool HasLeftSibling = index > 0;
+                    bool HasRightSibling = index < parentNode.size;
+                    if (HasLeftSibling)
+                    {
+                        auto &leftSibling = bufferPool->get(parentNode.children[index - 1], SCAN_TYPE);
+                        if (insert_index > 0 && leftSibling.size + insert_index <= max_keys) // insert into left sibling
+                        {
+                            for (int i = leftSibling.size; i < insert_index + leftSibling.size; ++i)
+                                leftSibling.Keys[i] = node.Keys[i - leftSibling.size];
+                            for (int i = 1; i < node.size - insert_index + 1; ++i)
+                                node.Keys[i] = node.Keys[insert_index + i - 1];
+                            node.Keys[0] = keyValuePair;
+                            leftSibling.size += insert_index;
+                            node.size -= insert_index - 1;
+                            fix_parent(node_pos, node.Keys[0], trace_index);
+                            bufferPool->put(parentNode.children[index - 1], leftSibling, SCAN_TYPE);
+                            bufferPool->put(node_pos, node, SCAN_TYPE);
+                            return;
+                        }
+                    }
+                    if (HasRightSibling)
+                    {
+                        auto &rightSibling = bufferPool->get(parentNode.children[index + 1], SCAN_TYPE);
+
+                        // Build a temporary sorted array after inserting keyValuePair.
+                        sjtu::pair<T, int> temp[max_keys + 1];
+                        for (int i = 0; i < insert_index; ++i)
+                            temp[i] = node.Keys[i];
+                        temp[insert_index] = keyValuePair;
+                        for (int i = insert_index; i < node.size; ++i)
+                            temp[i + 1] = node.Keys[i];
+
+                        // Keep the left part in current node, push the suffix to right sibling.
+                        int keep_in_node = insert_index + 1;
+                        if (keep_in_node > max_keys)
+                            keep_in_node = max_keys;
+                        int move_count = node.size + 1 - keep_in_node;
+
+                        if (rightSibling.size + move_count <= max_keys)
+                        {
+                            for (int i = rightSibling.size - 1; i >= 0; --i)
+                                rightSibling.Keys[i + move_count] = rightSibling.Keys[i];
+                            for (int i = 0; i < move_count; ++i)
+                                rightSibling.Keys[i] = temp[keep_in_node + i];
+                            for (int i = 0; i < keep_in_node; ++i)
+                                node.Keys[i] = temp[i];
+
+                            node.size = keep_in_node;
+                            rightSibling.size += move_count;
+
+                            bufferPool->put(parentNode.children[index + 1], rightSibling, SCAN_TYPE);
+                            bufferPool->put(node_pos, node, SCAN_TYPE);
+
+                            // Node minimum key may change if inserted at position 0.
+                            if (insert_index == 0)
+                                fix_parent(node_pos, node.Keys[0], trace_index);
+
+                            // Separator between current node and right sibling must always be refreshed.
+                            Node<order> parentRefreshed = bufferPool->get(node.parent, INDEX_TYPE);
+                            parentRefreshed.Keys[index] = rightSibling.Keys[0];
+                            bufferPool->put(node.parent, parentRefreshed, INDEX_TYPE);
+                            return;
+                        }
+                    }
+                    for (int i = node.size; i > insert_index; --i)
+                        node.Keys[i] = node.Keys[i - 1];
+                    node.Keys[insert_index] = keyValuePair;
+                    ++node.size;
+                    split(node, node_pos);
+                }
+            }
         }
     }
     void remove(const T &key, int value)
@@ -598,7 +686,7 @@ public:
 
         static char out_buf[131072];
         char *ptr = out_buf;
-        const char *const buf_end = out_buf + 131000; 
+        const char *const buf_end = out_buf + 131000;
         bool found_any = false;
 
         // 模拟 keyValuePair 比较
