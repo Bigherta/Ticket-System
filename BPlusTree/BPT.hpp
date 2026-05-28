@@ -7,34 +7,6 @@
 #include "vector.hpp"
 constexpr int order = 48; // B+树的阶数，决定了每个节点的最大子节点数和最大键数
 template<class T>
-inline int BinarySearch(const T arr[], int size, const T &key) // upper_bound
-{
-    int left = 0, right = size;
-    while (left < right)
-    {
-        int mid = left + (right - left) / 2;
-        if (arr[mid] <= key)
-            left = mid + 1;
-        else
-            right = mid;
-    }
-    return left;
-}
-template<class T>
-inline int BinarySearch(const sjtu::pair<T, int> arr[], int size, const T &key) // lower_bound
-{
-    int left = 0, right = size;
-    while (left < right)
-    {
-        int mid = left + (right - left) / 2;
-        if (arr[mid].first < key)
-            left = mid + 1;
-        else
-            right = mid;
-    }
-    return left;
-}
-template<class T>
 class BPT
 {
 private:
@@ -70,6 +42,35 @@ private:
     static constexpr AccessType SCAN_TYPE = AccessType::Scan;
     static constexpr AccessType LOOKUP_TYPE = AccessType::Lookup;
     static constexpr AccessType INDEX_TYPE = AccessType::Index;
+
+    static inline auto upper_bound_pair = [](const sjtu::pair<T, int> *arr, int size,
+                                             const sjtu::pair<T, int> &key)
+    {
+        int left = 0, right = size;
+        while (left < right)
+        {
+            int mid = left + (right - left) / 2;
+            if (arr[mid] <= key)
+                left = mid + 1;
+            else
+                right = mid;
+        }
+        return left;
+    };
+
+    static inline auto lower_bound_key = [](const sjtu::pair<T, int> *arr, int size, const T &key)
+    {
+        int left = 0, right = size;
+        while (left < right)
+        {
+            int mid = left + (right - left) / 2;
+            if (arr[mid].first < key)
+                left = mid + 1;
+            else
+                right = mid;
+        }
+        return left;
+    };
 
 
     void split(Node<order> &node, int node_pos)
@@ -134,7 +135,7 @@ private:
         else
         {
             Node<order> &parentNode = bufferPool->get(node.parent, INDEX_TYPE);
-            int pos = BinarySearch(parentNode.Keys, parentNode.size, midKey);
+            int pos = upper_bound_pair(parentNode.Keys, parentNode.size, midKey);
             for (int i = parentNode.size; i > pos; --i)
                 parentNode.Keys[i] = parentNode.Keys[i - 1];
             for (int i = parentNode.size + 1; i > pos + 1; --i)
@@ -476,12 +477,12 @@ public:
             while (!node.isLeaf)
             {
                 // Keep order by (key, value) so duplicated keys with different values are all indexed.
-                int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
+                int child_index = upper_bound_pair(node.Keys, node.size, keyValuePair);
                 trace_index.push_back(child_index);
                 node_pos = node.children[child_index];
                 node = bufferPool->get(node_pos, INDEX_TYPE);
             }
-            int insert_index = BinarySearch(node.Keys, node.size, keyValuePair);
+            int insert_index = upper_bound_pair(node.Keys, node.size, keyValuePair);
             if (node.size < max_keys) // node has space, insert directly
             {
                 for (int i = node.size; i > insert_index; --i)
@@ -590,12 +591,12 @@ public:
         sjtu::pair<T, int> keyValuePair(key, value);
         while (!node.isLeaf)
         {
-            int child_index = BinarySearch(node.Keys, node.size, keyValuePair);
+            int child_index = upper_bound_pair(node.Keys, node.size, keyValuePair);
             trace_index.push_back(child_index);
             node_pos = node.children[child_index];
             node = bufferPool->get(node_pos, INDEX_TYPE);
         }
-        int upper_index = BinarySearch(node.Keys, node.size, keyValuePair);
+        int upper_index = upper_bound_pair(node.Keys, node.size, keyValuePair);
         if (upper_index == 0 || node.Keys[upper_index - 1] != keyValuePair)
         {
             return;
@@ -608,7 +609,7 @@ public:
         bufferPool->put(node_pos, node, SCAN_TYPE);
 
         // If the deleted key was the first key, subtree minimum may have changed.
-        if (upper_index == 1)
+        if (upper_index == 1 && node.size > 0)
             fix_parent(node_pos, node.Keys[0], trace_index);
 
         int min_size = min_leaf_keys_non_root; // minimum number of keys in a non-root leaf
@@ -657,11 +658,11 @@ public:
         }
 
         Node<order> node = bufferPool->get(root_pos, LOOKUP_TYPE);
-        int child_index = BinarySearch(node.Keys, node.size, key);
+        int child_index = lower_bound_key(node.Keys, node.size, key);
         while (!node.isLeaf)
         {
             node = bufferPool->get(node.children[child_index], INDEX_TYPE);
-            child_index = BinarySearch(node.Keys, node.size, key);
+            child_index = lower_bound_key(node.Keys, node.size, key);
         }
 
         int scan_index = child_index;
