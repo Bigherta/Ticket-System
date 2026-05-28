@@ -34,6 +34,7 @@ private:
         bool is_deleted = false;
         ArcStatus status = T1;
         AccessType access_type = AccessType::Unknown;
+        char scan_count = 0;
     };
 
     struct GhostEntry
@@ -67,9 +68,6 @@ private:
 
     sjtu::unordered_map<int, PageTableEntry> page_table;
     sjtu::unordered_map<int, GhostPageTableEntry> ghost_table;
-
-    // scan counter: page_id -> number of consecutive Scan accesses
-    sjtu::unordered_map<int, int> scan_counter_;
 
     int p = 0;
 
@@ -205,7 +203,6 @@ private:
                 }
             }
 
-            scan_counter_.erase(pid);
             page_table.erase(pid);
             list.erase(it);
             return;
@@ -235,7 +232,7 @@ public:
                 {
                     // Window-based promotion for Scan accesses:
                     // increment counter, promote to T2 only if threshold reached.
-                    auto &cnt = scan_counter_[page_id];
+                    auto &cnt = frame_it->scan_count;
                     cnt++;
                     if (cnt >= K_SCAN_PROMOTION_THRESHOLD)
                     {
@@ -245,7 +242,7 @@ public:
                         entry.frame_it = t2.begin();
                         entry.status = T2;
 
-                        scan_counter_.erase(page_id);
+                        cnt = 0; // reset counter after promotion
                         return t2.front().page;
                     }
                     // Not enough consecutive Scan accesses yet, stay in T1
@@ -261,7 +258,6 @@ public:
                     entry.frame_it = t2.begin();
                     entry.status = T2;
 
-                    scan_counter_.erase(page_id);
                     return t2.front().page;
                 }
             }
@@ -324,7 +320,7 @@ public:
                 // Scan access from ghost: insert into T1 with scan counter
                 t1.push_front({page_id, page, false, false, T1, access_type});
                 page_table[page_id] = {t1.begin(), T1};
-                scan_counter_[page_id] = 1;
+                t1.front().scan_count = 1;
                 return t1.front().page;
             }
             else
@@ -356,7 +352,7 @@ public:
             page_table[page_id] = {t1.begin(), T1};
             if (access_type == AccessType::Scan)
             {
-                scan_counter_[page_id] = 1;
+                t1.front().scan_count = 1;
             }
             return t1.front().page;
         }
@@ -380,7 +376,7 @@ public:
                 if (access_type == AccessType::Scan)
                 {
                     // Window-based promotion for Scan accesses
-                    auto &cnt = scan_counter_[page_id];
+                    auto &cnt = frame_it->scan_count;
                     cnt++;
                     if (cnt >= K_SCAN_PROMOTION_THRESHOLD)
                     {
@@ -389,8 +385,6 @@ public:
                         t2.splice(t2.begin(), t1, frame_it);
                         entry.frame_it = t2.begin();
                         entry.status = T2;
-
-                        scan_counter_.erase(page_id);
                     }
                     else
                     {
@@ -404,8 +398,6 @@ public:
                     t2.splice(t2.begin(), t1, frame_it);
                     entry.frame_it = t2.begin();
                     entry.status = T2;
-
-                    scan_counter_.erase(page_id);
                 }
             }
             else if (entry.status == T2)
@@ -455,7 +447,7 @@ public:
                 {
                     t1.push_front({page_id, page, true, false, T1, access_type});
                     page_table[page_id] = {t1.begin(), T1};
-                    scan_counter_[page_id] = 1;
+                    t1.front().scan_count = 1;
                 }
                 else
                 {
@@ -479,7 +471,7 @@ public:
                     page_table[page_id] = {t1.begin(), T1};
                     if (access_type == AccessType::Scan)
                     {
-                        scan_counter_[page_id] = 1;
+                        t1.front().scan_count = 1;
                     }
                 }
             }
@@ -502,7 +494,6 @@ public:
                 t2.erase(entry.frame_it);
             }
             page_table.erase(pt_it);
-            scan_counter_.erase(page_id);
         }
 
         auto gt_it = ghost_table.find(page_id);
@@ -543,7 +534,6 @@ public:
             {
                 disk.Delete(it->page_id);
                 page_table.erase(it->page_id);
-                scan_counter_.erase(it->page_id);
                 it = t1.erase(it);
             }
             else
@@ -563,7 +553,6 @@ public:
             {
                 disk.Delete(it->page_id);
                 page_table.erase(it->page_id);
-                scan_counter_.erase(it->page_id);
                 it = t2.erase(it);
             }
             else
