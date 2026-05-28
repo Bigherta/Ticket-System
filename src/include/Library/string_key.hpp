@@ -7,11 +7,11 @@ namespace sjtu {
     struct StringKey {
         char str[N];
         StringKey() { std::memset(str, 0, N); }
-        explicit StringKey(const char* s) {
+        StringKey(const char* s) {
             std::memset(str, 0, N);
             if (s) std::strncpy(str, s, N - 1);
         }
-        explicit StringKey(const std::string &s) {
+        StringKey(const std::string &s) {
             std::memset(str, 0, N);
             size_t len = s.size();
             if (len > N - 1) len = N - 1;
