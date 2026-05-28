@@ -6,18 +6,26 @@ struct Key65
 {
     char data[65];
 
-    Key65() { data[0] = '\0'; }
+    Key65() { std::memset(data, 0, sizeof(data)); }
 
     explicit Key65(const std::string &s)
     {
-        std::strncpy(data, s.c_str(), 64);
-        data[64] = '\0';
+        std::memset(data, 0, sizeof(data));
+        size_t len = s.size();
+        if (len > 64)
+            len = 64;
+        std::memcpy(data, s.data(), len);
     }
 
-    bool operator<(const Key65 &other) const { return std::strcmp(data, other.data) < 0; }
-    bool operator==(const Key65 &other) const { return std::strcmp(data, other.data) == 0; }
+    static int cmp(const Key65 &a, const Key65 &b)
+    {
+        return std::memcmp(a.data, b.data, 64);
+    }
+
+    bool operator<(const Key65 &other) const { return cmp(*this, other) < 0; }
+    bool operator==(const Key65 &other) const { return cmp(*this, other) == 0; }
     bool operator!=(const Key65 &other) const { return !(*this == other); }
-    bool operator<=(const Key65 &other) const { return std::strcmp(data, other.data) <= 0; }
+    bool operator<=(const Key65 &other) const { return cmp(*this, other) <= 0; }
 };
 
 int main()
