@@ -239,12 +239,9 @@ public:
                     cnt++;
                     if (cnt >= K_SCAN_PROMOTION_THRESHOLD)
                     {
-                        Frame frame = *frame_it;
-                        frame.status = T2;
-                        frame.access_type = access_type;
-                        t1.erase(frame_it);
-
-                        t2.push_front(frame);
+                        frame_it->status = T2;
+                        frame_it->access_type = access_type;
+                        t2.splice(t2.begin(), t1, frame_it);
                         entry.frame_it = t2.begin();
                         entry.status = T2;
 
@@ -258,12 +255,9 @@ public:
                 else
                 {
                     // Lookup, Index, or Unknown: immediate promotion to T2
-                    Frame frame = *frame_it;
-                    frame.status = T2;
-                    frame.access_type = access_type;
-                    t1.erase(frame_it);
-
-                    t2.push_front(frame);
+                    frame_it->status = T2;
+                    frame_it->access_type = access_type;
+                    t2.splice(t2.begin(), t1, frame_it);
                     entry.frame_it = t2.begin();
                     entry.status = T2;
 
@@ -390,12 +384,9 @@ public:
                     cnt++;
                     if (cnt >= K_SCAN_PROMOTION_THRESHOLD)
                     {
-                        Frame frame = *frame_it;
-                        frame.status = T2;
-                        frame.access_type = access_type;
-                        t1.erase(frame_it);
-
-                        t2.push_front(frame);
+                        frame_it->status = T2;
+                        frame_it->access_type = access_type;
+                        t2.splice(t2.begin(), t1, frame_it);
                         entry.frame_it = t2.begin();
                         entry.status = T2;
 
@@ -408,12 +399,9 @@ public:
                 }
                 else
                 {
-                    Frame frame = *frame_it;
-                    frame.status = T2;
-                    frame.access_type = access_type;
-                    t1.erase(frame_it);
-
-                    t2.push_front(frame);
+                    frame_it->status = T2;
+                    frame_it->access_type = access_type;
+                    t2.splice(t2.begin(), t1, frame_it);
                     entry.frame_it = t2.begin();
                     entry.status = T2;
 
