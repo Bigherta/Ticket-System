@@ -2,21 +2,23 @@
 #define BPT_MEMORYRIVER_HPP
 
 #include <fstream>
+#include "../Library/vector.hpp"
 
 using std::fstream;
 using std::ifstream;
 using std::ofstream;
 using std::string;
 
-template<class T, int info_len = 3>
+template<class T, int info_len = 2>
 class MemoryRiver
 {
 private:
     fstream file;
+    fstream free_file;
     string file_name;
     int sizeofT = sizeof(T);
-
-    static constexpr int FREE_LIST_SLOT = info_len - 1; // zero-based index
+    sjtu::vector<int> free_index;
+    std::string free_block_name() { return file_name + ".free"; }
 
     void ensure_data_file_open()
     {
@@ -33,6 +35,15 @@ public:
     {
         if (file.is_open())
             file.close();
+        if (free_file.is_open())
+            free_file.close();
+        free_file.open(free_block_name(), std::ios::out | std::ios::trunc | std::ios::binary);
+        for (auto &index : free_index)
+        {
+            free_file.write(reinterpret_cast<char *>(&index), sizeof(int));
+        }
+        if (free_file.is_open())
+            free_file.close();
     }
 
     void initialise(string FN = "")
@@ -40,8 +51,9 @@ public:
         if (!FN.empty())
             file_name = FN;
 
-        // Open data file. If it does not exist, create it and initialize
-        // the info area (all zeros).
+        free_index.clear();
+
+        // Open data file. If it does not exist, create it and initialize info area.
         file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
         if (!file.is_open())
         {
@@ -52,9 +64,30 @@ public:
             file.close();
             file.open(file_name, std::ios::in | std::ios::out | std::ios::binary);
         }
+
+        // Open free-list file. If it does not exist, create it first.
+        free_file.open(free_block_name(), std::ios::in | std::ios::out | std::ios::binary);
+        if (!free_file.is_open())
+        {
+            free_file.open(free_block_name(), std::ios::out | std::ios::binary);
+            free_file.close();
+            free_file.open(free_block_name(), std::ios::in | std::ios::out | std::ios::binary);
+        }
+
+        free_file.seekg(0, std::ios::end);
+        int free_file_end = free_file.tellg();
+        free_file.seekg(0, std::ios::beg);
+        while (free_file.tellg() + static_cast<std::streamoff>(sizeof(int)) <= free_file_end)
+        {
+            int free_pos;
+            free_file.read(reinterpret_cast<char *>(&free_pos), sizeof(int));
+            free_index.push_back(free_pos);
+        }
+
+        free_file.close();
     }
 
-    // Read the n-th int from the info area (1-based).
+    // 读出第n个int的值赋给tmp，1_base
     void get_info(int &tmp, int n)
     {
         if (n < 1 || n > info_len)
@@ -65,7 +98,7 @@ public:
         file.read(reinterpret_cast<char *>(&tmp), sizeof(int));
     }
 
-    // Write the n-th int into the info area (1-based).
+    // 将tmp写入第n个int的位置，1_base
     void write_info(int tmp, int n)
     {
         if (n < 1 || n > info_len)
@@ -76,39 +109,23 @@ public:
         file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
     }
 
-    // Allocate space for a new object T and write it. Returns the
-    // byte-offset where the object was written.
-    // If the free list is non-empty, reuse a previously deleted block.
+    // 在文件合适位置写入类对象t，并返回写入的位置索引index
+    // 位置索引意味着当输入正确的位置索引index，在以下三个函数中都能顺利的找到目标对象进行操作
+    // 位置索引index可以取为对象写入的起始位置
     int write(T &t)
     {
         ensure_data_file_open();
         file.clear();
-
-        // Read current free-list head.
-        int free_head = 0;
-        get_info(free_head, FREE_LIST_SLOT + 1); // 1-based
-
         int index;
-        if (free_head != 0)
+        if (!free_index.empty())
         {
-            // Reuse the freed block. First, read the "next" pointer stored
-            // at the beginning of the freed block to update the head.
-            int next_free = 0;
-            file.seekg(free_head);
-            file.read(reinterpret_cast<char *>(&next_free), sizeof(int));
-
-            // Overwrite the freed block with the new object.
-            file.seekp(free_head);
+            file.seekp(free_index.back());
+            free_index.pop_back();
+            index = file.tellp();
             file.write(reinterpret_cast<char *>(&t), sizeofT);
-
-            // Update free-list head to next_free.
-            write_info(next_free, FREE_LIST_SLOT + 1);
-
-            index = free_head;
         }
         else
         {
-            // Free list is empty; append to end of file.
             file.seekp(0, std::ios::end);
             index = file.tellp();
             file.write(reinterpret_cast<char *>(&t), sizeofT);
@@ -116,7 +133,7 @@ public:
         return index;
     }
 
-    // Overwrite the object at byte-offset 'index'.
+    // 用t的值更新位置索引index对应的对象，保证调用的index都是由write函数产生
     void update(T &t, const int index)
     {
         ensure_data_file_open();
@@ -125,7 +142,7 @@ public:
         file.write(reinterpret_cast<char *>(&t), sizeofT);
     }
 
-    // Read the object at byte-offset 'index' into t.
+    // 读出位置索引index对应的T对象的值并赋值给t，保证调用的index都是由write函数产生
     void read(T &t, const int index)
     {
         ensure_data_file_open();
@@ -134,36 +151,9 @@ public:
         file.read(reinterpret_cast<char *>(&t), sizeofT);
     }
 
-    // Free the block at byte-offset 'index'.
-    // Pushes 'index' onto the embedded free list.
-    void Delete(int index)
-    {
-        ensure_data_file_open();
-        file.clear();
-
-        // Read current free-list head.
-        int free_head = 0;
-        get_info(free_head, FREE_LIST_SLOT + 1); // 1-based
-
-        // Write the current head as the "next" pointer at the beginning
-        // of the freed block.
-        file.seekp(index);
-        file.write(reinterpret_cast<char *>(&free_head), sizeof(int));
-
-        // Update free-list head to point to this newly freed block.
-        write_info(index, FREE_LIST_SLOT + 1);
-    }
-
-    void clear()
-    {
-        if (file.is_open())
-            file.close();
-        file.open(file_name, std::ios::out | std::ios::trunc | std::ios::binary);
-        int tmp = 0;
-        for (int i = 0; i < info_len; ++i)
-            file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
-        file.close();
-    }
+    // 删除位置索引index对应的对象，保证调用的index都是由write函数产生
+    void Delete(int index) { /* your code here */ free_index.push_back(index); }
 };
+
 
 #endif // BPT_MEMORYRIVER_HPP
