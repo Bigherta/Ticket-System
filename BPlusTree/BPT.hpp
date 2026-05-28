@@ -5,7 +5,7 @@
 #include "BufferPoolManager.hpp"
 #include "utility.hpp"
 #include "vector.hpp"
-constexpr int order = 48;
+constexpr int PAGE_SIZE = 4096;
 template<class T>
 inline int BinarySearch(const T arr[], int size, const T &key) // upper_bound
 {
@@ -39,6 +39,7 @@ class BPT
 {
 private:
     // Standard definition: order = maximum children count of an internal node.
+    static const int order = (PAGE_SIZE - 32) / (sizeof(sjtu::pair<T, int>) + sizeof(int));
     static constexpr int max_children = order;
     static constexpr int max_keys = max_children - 1;
     static constexpr int min_children_non_root_internal = (max_children + 1) / 2; // ceil(m / 2)
