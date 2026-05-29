@@ -65,6 +65,7 @@ public:
      * @return 匹配的 TokenType，如果未匹配返回 BLANK
      */
     TokenType matchkeyword(ParserState state, const std::string &text) const;
+    TokenType matchkeyword(ParserState state, const char *text, size_t len) const;
 
     /**
      * @brief 执行解析和指令处理

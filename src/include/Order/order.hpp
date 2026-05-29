@@ -31,27 +31,22 @@ private:
     orderState state;
     operator std::string() const
     {
-        std::string res;
-        if (state == orderState::SUCCESS)
-            res += "[success] ";
-        else if (state == orderState::REFUNDED)
-            res += "[refunded] ";
-        else
-            res += "[pending] ";
-        res += train_id;
-        res += " ";
-        res += from;
-        res += " ";
-        res += std::string(depart_time);
-        res += " -> ";
-        res += to;
-        res += " ";
-        res += std::string(arrive_time);
-        res += " ";
-        res += std::to_string(price);
-        res += " ";
-        res += std::to_string(num);
-        return res;
+        char buf[256];
+        const char *state_str = (state == orderState::SUCCESS) ? "[success] " :
+                                (state == orderState::REFUNDED) ? "[refunded] " :
+                                                                  "[pending] ";
+        std::snprintf(buf, sizeof(buf), "%s%s %s %02d-%02d %02d:%02d -> %s %02d-%02d %02d:%02d %lld %d",
+                      state_str,
+                      train_id,
+                      from,
+                      depart_time.date.month, depart_time.date.day,
+                      depart_time.time.hour, depart_time.time.minute,
+                      to,
+                      arrive_time.date.month, arrive_time.date.day,
+                      arrive_time.time.hour, arrive_time.time.minute,
+                      price,
+                      num);
+        return std::string(buf);
     }
 
 public:

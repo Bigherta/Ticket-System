@@ -146,10 +146,12 @@ std::string OrderManager::queryOrder(const std::string &username) const
     std::string res;
     res += std::to_string(order_list.size());
     res += "\n";
+    // Pre-allocate to avoid repeated reallocations in the loop.
+    // Each order line is ~70–100 chars; use 128 as a safe estimate.
+    res.reserve(res.size() + order_list.size() * 128);
     for (int i = (int) order_list.size() - 1; i >= 0; --i)
     {
-        auto order = order_buffer_pool->get(order_list[i].order_index);
-        res += std::string(order);
+        res += std::string(order_buffer_pool->get(order_list[i].order_index));
         if (i != 0)
             res += "\n";
     }

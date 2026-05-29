@@ -33,27 +33,76 @@ TokenType Parser::matchkeyword(ParserState state, const std::string &text) const
     return BLANK;
 }
 
+// 参数 key 全是 "-X" 2字符格式 → 嵌套 switch 直接匹配，零分配
+TokenType Parser::matchkeyword(ParserState state, const char *text, size_t len) const
+{
+    if (len == 2 && text[0] == '-') {
+        char c = text[1];
+        switch (state) {
+            case ParserState::USER:
+                switch (c) {
+                    case 'c': return CURUSERNAME;
+                    case 'u': return USERNAME;
+                    case 'p': return PASSWORD;
+                    case 'n': return NAME;
+                    case 'm': return MAILADDRESS;
+                    case 'g': return PRIVILEGE;
+                }
+                break;
+            case ParserState::TRAINCMD:
+                switch (c) {
+                    case 'i': return TRAINID;
+                    case 'n': return STATIONNUM;
+                    case 'm': return SEATNUM;
+                    case 's': return STATIONS;
+                    case 'p': return PRICES;
+                    case 'x': return STARTTIME;
+                    case 't': return TRAVELTIMES;
+                    case 'o': return STOPOVERTIMES;
+                    case 'd': return SALEDATE;
+                    case 'y': return TRAINTYPE;
+                }
+                break;
+            case ParserState::TICKETCMD:
+                switch (c) {
+                    case 'u': return USERNAME;
+                    case 'i': return TRAINID;
+                    case 'd': return QUERYDATE;
+                    case 's': return STARTPLACE;
+                    case 't': return DESTINATION;
+                    case 'q': return INQUEUE;
+                    case 'n': return NUMBER;
+                    case 'f': return STARTPLACE;
+                    case 'p': return PRIORITY;
+                }
+                break;
+            default: break;
+        }
+    }
+    // 兜底：长命令词等仍走 hash 表查找
+    return matchkeyword(state, std::string(text, len));
+}
+
 // 解析一行输入，将输入行分割成 tokens
 TokenStream Parser::tokenize(std::string &result, const std::string &line_raw, int &time_stamp) const
 {
     // 支持行首可选的时间戳格式 [<timestamp>]
-    std::string line = line_raw;
-    if (!line.empty() && line.front() == '[')
+    size_t i = 0;
+    if (!line_raw.empty() && line_raw.front() == '[')
     {
-        auto pos = line.find(']');
+        size_t pos = line_raw.find(']');
         if (pos != std::string::npos)
         {
-            result = line.substr(0, pos + 1); // 提取时间戳
-            time_stamp = std::stoi(line.substr(1, pos - 1)); // 将时间戳字符串转换为整数
+            result = line_raw.substr(0, pos + 1); // 提取时间戳
+            time_stamp = std::stoi(line_raw.substr(1, pos - 1)); // 将时间戳字符串转换为整数
             result += " "; // 格式化处理时间戳
-            line = line.substr(pos + 1);
+            i = pos + 1;
         }
     }
-
+    const std::string &line = line_raw;
     sjtu::vector<Token> tokens;
 
     // extract the command token (the first non-space word)
-    size_t i = 0;
     // skip spaces
     while (i < line.size() && std::isspace(static_cast<unsigned char>(line[i])))
         ++i;
@@ -76,12 +125,11 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw, i
             ++i;
         if (i >= line.size())
             break;
-        // parse a parameter token
+        // parse a parameter key token (-X) → 零分配 switch 匹配
         start = i;
         while (i < line.size() && !std::isspace(static_cast<unsigned char>(line[i])))
             ++i;
-        word = line.substr(start, i - start);
-        type = matchkeyword(state, word);
+        type = matchkeyword(state, &line[start], i - start);
 
         // skip spaces between key and value
         while (i < line.size() && std::isspace(static_cast<unsigned char>(line[i])))
@@ -91,8 +139,7 @@ TokenStream Parser::tokenize(std::string &result, const std::string &line_raw, i
         start = i;
         while (i < line.size() && !std::isspace(static_cast<unsigned char>(line[i])))
             ++i;
-        word = line.substr(start, i - start);
-        tokens.push_back(Token{type, word});
+        tokens.push_back(Token{type, line.substr(start, i - start)});
     }
     return TokenStream(std::move(tokens));
 }
@@ -180,34 +227,6 @@ struct ParserStaticInit
         Parser::CMDTABLE.insert({"buy_ticket", BUYTICKET});
         Parser::CMDTABLE.insert({"clean", CLEAN});
         Parser::CMDTABLE.insert({"exit", EXIT});
-
-        Parser::USERTABLE.insert({"-c", CURUSERNAME});
-        Parser::USERTABLE.insert({"-u", USERNAME});
-        Parser::USERTABLE.insert({"-p", PASSWORD});
-        Parser::USERTABLE.insert({"-n", NAME});
-        Parser::USERTABLE.insert({"-m", MAILADDRESS});
-        Parser::USERTABLE.insert({"-g", PRIVILEGE});
-
-        Parser::TRAINCOMMANDTABLE.insert({"-i", TRAINID});
-        Parser::TRAINCOMMANDTABLE.insert({"-n", STATIONNUM});
-        Parser::TRAINCOMMANDTABLE.insert({"-m", SEATNUM});
-        Parser::TRAINCOMMANDTABLE.insert({"-s", STATIONS});
-        Parser::TRAINCOMMANDTABLE.insert({"-p", PRICES});
-        Parser::TRAINCOMMANDTABLE.insert({"-x", STARTTIME});
-        Parser::TRAINCOMMANDTABLE.insert({"-t", TRAVELTIMES});
-        Parser::TRAINCOMMANDTABLE.insert({"-o", STOPOVERTIMES});
-        Parser::TRAINCOMMANDTABLE.insert({"-d", SALEDATE});
-        Parser::TRAINCOMMANDTABLE.insert({"-y", TRAINTYPE});
-
-        Parser::TICKETCOMMANDTABLE.insert({"-u", USERNAME});
-        Parser::TICKETCOMMANDTABLE.insert({"-i", TRAINID});
-        Parser::TICKETCOMMANDTABLE.insert({"-d", QUERYDATE});
-        Parser::TICKETCOMMANDTABLE.insert({"-s", STARTPLACE});
-        Parser::TICKETCOMMANDTABLE.insert({"-t", DESTINATION});
-        Parser::TICKETCOMMANDTABLE.insert({"-q", INQUEUE});
-        Parser::TICKETCOMMANDTABLE.insert({"-n", NUMBER});
-        Parser::TICKETCOMMANDTABLE.insert({"-f", STARTPLACE});
-        Parser::TICKETCOMMANDTABLE.insert({"-p", PRIORITY});
     }
 };
 static ParserStaticInit parser_static_init_instance;
