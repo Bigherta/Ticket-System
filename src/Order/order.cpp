@@ -50,19 +50,29 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     AccurateTime from_depart(Date(date), depart_clock);
     int travel_minutes = train.arrive_time_offset[to_index] - train.depart_time_offset[from_index];
 
+    // Check availability and update in a single pass to avoid redundant B+Tree lookups
     int min_seat = train.total_seat_num;
+    struct SegmentSeatInfo
+    {
+        TrainManager::SeatStatus key;
+        int seat_value;
+        bool exists;
+    };
+    SegmentSeatInfo seg_info[100];
+    int seg_count = to_index - from_index;
     for (int i = from_index; i < to_index; ++i)
     {
+        int idx = i - from_index;
         AccurateTime segment_depart =
                 from_depart + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
-        TrainManager::SeatStatus key{};
-        key.train_addr = train_index;
-        key.station_index = i;
-        key.date = segment_depart.date;
-        auto seat_list = train_manager.seat_manager.visit(key);
-        int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
-        if (seat_left < min_seat)
-            min_seat = seat_left;
+        seg_info[idx].key.train_addr = train_index;
+        seg_info[idx].key.station_index = i;
+        seg_info[idx].key.date = segment_depart.date;
+        auto seat_list = train_manager.seat_manager.visit(seg_info[idx].key);
+        seg_info[idx].exists = !seat_list.empty();
+        seg_info[idx].seat_value = seg_info[idx].exists ? seat_list[0] : train.total_seat_num;
+        if (seg_info[idx].seat_value < min_seat)
+            min_seat = seg_info[idx].seat_value;
     }
     if (min_seat < num)
     {
@@ -95,25 +105,17 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
             return "queue";
         }
     }
-
-    for (int i = from_index; i < to_index; ++i)
+    for (int idx = 0; idx < seg_count; ++idx)
     {
-        AccurateTime segment_depart =
-                from_depart + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
-        TrainManager::SeatStatus key{};
-        key.train_addr = train_index;
-        key.station_index = i;
-        key.date = segment_depart.date;
-        auto seat_list = train_manager.seat_manager.visit(key);
-        if (seat_list.empty())
+        if (seg_info[idx].exists)
         {
-            train_manager.seat_manager.insert(key, train.total_seat_num - num);
+            int new_seat = seg_info[idx].seat_value - num;
+            train_manager.seat_manager.remove(seg_info[idx].key, seg_info[idx].seat_value);
+            train_manager.seat_manager.insert(seg_info[idx].key, new_seat);
         }
         else
         {
-            int seat_left = seat_list[0] - num;
-            train_manager.seat_manager.remove(key, seat_list[0]);
-            train_manager.seat_manager.insert(key, seat_left);
+            train_manager.seat_manager.insert(seg_info[idx].key, train.total_seat_num - num);
         }
     }
     Order order{};
@@ -259,41 +261,42 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
             continue;
 
         int min_seat = train.total_seat_num;
+        struct WSegInfo
+        {
+            TrainManager::SeatStatus key;
+            int seat_value;
+            bool exists;
+        };
+        WSegInfo wseg_info[100];
+        int wseg_count = w_to_index - w_from_index;
         for (int i = w_from_index; i < w_to_index; ++i)
         {
+            int idx = i - w_from_index;
             AccurateTime segment_depart =
                     w_order.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[w_from_index]);
-            TrainManager::SeatStatus key{};
-            key.train_addr = train_index;
-                key.station_index = i;
-            key.date = segment_depart.date;
-            auto seat_list = train_manager.seat_manager.visit(key);
-            int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
-            if (seat_left < min_seat)
-                min_seat = seat_left;
+            wseg_info[idx].key.train_addr = train_index;
+            wseg_info[idx].key.station_index = i;
+            wseg_info[idx].key.date = segment_depart.date;
+            auto seat_list = train_manager.seat_manager.visit(wseg_info[idx].key);
+            wseg_info[idx].exists = !seat_list.empty();
+            wseg_info[idx].seat_value = wseg_info[idx].exists ? seat_list[0] : train.total_seat_num;
+            if (wseg_info[idx].seat_value < min_seat)
+                min_seat = wseg_info[idx].seat_value;
         }
 
         if (min_seat >= w_order.num)
         {
-            // Fulfill this waiting order!
-            for (int i = w_from_index; i < w_to_index; ++i)
+            for (int idx = 0; idx < wseg_count; ++idx)
             {
-                AccurateTime segment_depart =
-                        w_order.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[w_from_index]);
-                TrainManager::SeatStatus key{};
-                key.train_addr = train_index;
-                key.station_index = i;
-                key.date = segment_depart.date;
-                auto seat_list = train_manager.seat_manager.visit(key);
-                if (seat_list.empty())
+                if (wseg_info[idx].exists)
                 {
-                    train_manager.seat_manager.insert(key, train.total_seat_num - w_order.num);
+                    int new_seat = wseg_info[idx].seat_value - w_order.num;
+                    train_manager.seat_manager.remove(wseg_info[idx].key, wseg_info[idx].seat_value);
+                    train_manager.seat_manager.insert(wseg_info[idx].key, new_seat);
                 }
                 else
                 {
-                    int seat_left = seat_list[0] - w_order.num;
-                    train_manager.seat_manager.remove(key, seat_list[0]);
-                    train_manager.seat_manager.insert(key, seat_left);
+                    train_manager.seat_manager.insert(wseg_info[idx].key, train.total_seat_num - w_order.num);
                 }
             }
             fulfilled_orders.push_back({iter.second, w_order});
