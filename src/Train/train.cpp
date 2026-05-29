@@ -256,67 +256,77 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
             delete price_queue;
         return "0"; // no train available
     }
-    sjtu::unordered_map<int, int> from_trains; // train_index -> index_in_from_list
-    for (size_t i = 0; i < from_list.size(); ++i)
+    const auto *map_list = &from_list;
+    const auto *scan_list = &to_list;
+    bool map_is_from = true;
+    if (from_list.size() > to_list.size())
     {
-        from_trains.insert({from_list[i].first, i});
+        map_list = &to_list;
+        scan_list = &from_list;
+        map_is_from = false;
+    }
+    sjtu::unordered_map<int, int> train_index_map(map_list->size() * 2 + 1);
+    for (size_t i = 0; i < map_list->size(); ++i)
+    {
+        train_index_map.insert({(*map_list)[i].first, i});
     }
     std::string result;
     Date query_date(date);
-    for (const auto &to_entry: to_list)
+    for (const auto &scan_entry: *scan_list)
     {
-        if (from_trains.find(to_entry.first) != from_trains.end())
+        auto it = train_index_map.find(scan_entry.first);
+        if (it == train_index_map.end())
+            continue;
+        const auto *from_entry = map_is_from ? &from_list[it->second] : &scan_entry;
+        const auto *to_entry = map_is_from ? &scan_entry : &to_list[it->second];
+        auto from_index = from_entry->second;
+        auto to_index = to_entry->second;
+        auto train = trainBufferPool->get(from_entry->first);
+        if (from_index >= to_index)
+            continue; // invalid route since the train goes from from_index to to_index
+        AccurateTime earliest_depart_time =
+                AccurateTime(train.start_date, train.start_time) + train.depart_time_offset[from_index];
+        AccurateTime latest_depart_time =
+                AccurateTime(train.end_date, train.start_time) + train.depart_time_offset[from_index];
+        if (query_date < earliest_depart_time.date || latest_depart_time.date < query_date)
+            continue; // train does not run on the given date
+        TrainRoute route;
+        std::strncpy(route.train_id, train.train_id, 20);
+        route.train_id[20] = '\0';
+        std::strncpy(route.from, train.stations[from_index], 40);
+        route.from[40] = '\0';
+        std::strncpy(route.to, train.stations[to_index], 40);
+        route.to[40] = '\0';
+        int travel_minutes = train.arrive_time_offset[to_index] - train.depart_time_offset[from_index];
+        int depart_minutes =
+                (train.start_time.hour * 60 + train.start_time.minute + train.depart_time_offset[from_index]) %
+                1440;
+        Time depart_clock(depart_minutes / 60, depart_minutes % 60);
+        route.depart_time = AccurateTime(query_date, depart_clock);
+        route.arrive_time = route.depart_time + travel_minutes;
+        route.total_time = travel_minutes;
+        route.total_price = train.prices_prefix[to_index] - train.prices_prefix[from_index];
+        int seat_left = train.total_seat_num;
+        for (int i = from_index; i < to_index; ++i)
         {
-            auto from_entry = from_list[from_trains[to_entry.first]];
-            auto from_index = from_entry.second;
-            auto to_index = to_entry.second;
-            auto train = trainBufferPool->get(from_entry.first);
-            if (from_index >= to_index)
-                continue; // invalid route since the train goes from from_index to to_index
-            AccurateTime earliest_depart_time =
-                    AccurateTime(train.start_date, train.start_time) + train.depart_time_offset[from_index];
-            AccurateTime latest_depart_time =
-                    AccurateTime(train.end_date, train.start_time) + train.depart_time_offset[from_index];
-            if (query_date < earliest_depart_time.date || latest_depart_time.date < query_date)
-                continue; // train does not run on the given date
-            TrainRoute route;
-            std::strncpy(route.train_id, train.train_id, 20);
-            route.train_id[20] = '\0';
-            std::strncpy(route.from, train.stations[from_index], 40);
-            route.from[40] = '\0';
-            std::strncpy(route.to, train.stations[to_index], 40);
-            route.to[40] = '\0';
-            int travel_minutes = train.arrive_time_offset[to_index] - train.depart_time_offset[from_index];
-            int depart_minutes =
-                    (train.start_time.hour * 60 + train.start_time.minute + train.depart_time_offset[from_index]) %
-                    1440;
-            Time depart_clock(depart_minutes / 60, depart_minutes % 60);
-            route.depart_time = AccurateTime(query_date, depart_clock);
-            route.arrive_time = route.depart_time + travel_minutes;
-            route.total_time = travel_minutes;
-            route.total_price = train.prices_prefix[to_index] - train.prices_prefix[from_index];
-            int seat_left = train.total_seat_num;
-            for (int i = from_index; i < to_index; ++i)
-            {
-                AccurateTime segment_depart =
-                        route.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
-                SeatStatus key{};
-                key.train_addr = from_entry.first;
-                key.station_index = i;
-                key.date = segment_depart.date;
-                auto seat_list = seat_manager.visit(key);
-                if (!seat_list.empty() && seat_list[0] < seat_left)
-                    seat_left = seat_list[0];
-            }
-            route.seat = seat_left;
-            if (priority == "time")
-            {
-                time_queue->push(route);
-            }
-            else if (priority == "cost")
-            {
-                price_queue->push(route);
-            }
+            AccurateTime segment_depart =
+                    route.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
+            SeatStatus key{};
+            key.train_addr = from_entry->first;
+            key.station_index = i;
+            key.date = segment_depart.date;
+            auto seat_list = seat_manager.visit(key);
+            if (!seat_list.empty() && seat_list[0] < seat_left)
+                seat_left = seat_list[0];
+        }
+        route.seat = seat_left;
+        if (priority == "time")
+        {
+            time_queue->push(route);
+        }
+        else if (priority == "cost")
+        {
+            price_queue->push(route);
         }
     }
     auto append_results = [&](auto *queue) {
