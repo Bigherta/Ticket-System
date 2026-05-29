@@ -66,6 +66,28 @@ public:
         }
     }
 };
+
+struct TrainSegment
+{
+    int train_addr;
+    int start_index;
+    int end_index;
+    bool operator<(const TrainSegment &other) const
+    {
+        if (train_addr != other.train_addr)
+            return train_addr < other.train_addr;
+        if (start_index != other.start_index)
+            return start_index < other.start_index;
+        return end_index < other.end_index;
+    }
+    bool operator==(const TrainSegment &other) const
+    {
+        return train_addr == other.train_addr && start_index == other.start_index && end_index == other.end_index;
+    }
+    bool operator!=(const TrainSegment &other) const { return !(*this == other); }
+    bool operator<=(const TrainSegment &other) const { return !(other < *this); }
+};
+
 class TrainManager
 {
     friend class Train;
@@ -153,6 +175,7 @@ public:
 private:
     BPT<sjtu::StringKey<21>, int> trainIndex;
     BPT<sjtu::StringKey<41>, sjtu::pair<int, int>> station_train_mapping;
+    BPT<sjtu::pair<sjtu::StringKey<41>, sjtu::StringKey<41>>, TrainSegment> trainSegmentIndex;
     struct SeatStatus
     {
         int train_addr;

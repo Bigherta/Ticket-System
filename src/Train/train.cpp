@@ -7,7 +7,8 @@
 #include "../include/Validator/validator.hpp"
 
 TrainManager::TrainManager() :
-    trainIndex("trainIndex.dat"), station_train_mapping("stationTrainMapping.dat"), seat_manager("seatManager.dat"),
+    trainIndex("trainIndex.dat"), station_train_mapping("stationTrainMapping.dat"),
+    trainSegmentIndex("trainSegmentIndex.dat"), seat_manager("seatManager.dat"),
     trainBufferPool(new BufferPoolManager<Train>(500, trainDatabase))
 {
     trainDatabase.initialise("trainDatabase.dat");
@@ -118,6 +119,19 @@ std::string TrainManager::releaseTrain(const std::string &train_id)
     for (int i = 0; i < temp.station_num; ++i)
     {
         station_train_mapping.insert(temp.stations[i], {pos_list[0], i});
+    }
+    for (int i = 0; i < temp.station_num; ++i)
+    {
+        for (int j = i + 1; j < temp.station_num; ++j)
+        {
+            sjtu::pair<sjtu::StringKey<41>, sjtu::StringKey<41>> segment_key(
+                sjtu::StringKey<41>(temp.stations[i]), sjtu::StringKey<41>(temp.stations[j]));
+            TrainSegment seg{};
+            seg.train_addr = pos_list[0];
+            seg.start_index = i;
+            seg.end_index = j;
+            trainSegmentIndex.insert(segment_key, seg);
+        }
     }
     auto next_date = [](const Date &current) {
         Date next = current;
@@ -242,48 +256,16 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
     {
         return "-1"; // invalid priority
     }
-    char from_key[41]{};
-    char to_key[41]{};
-    std::sprintf(from_key, "%s", from.c_str());
-    std::sprintf(to_key, "%s", to.c_str());
-    auto from_list = station_train_mapping.visit(from_key);
-    auto to_list = station_train_mapping.visit(to_key);
-    if (from_list.empty() || to_list.empty())
-    {
-        if (time_queue)
-            delete time_queue;
-        if (price_queue)
-            delete price_queue;
-        return "0"; // no train available
-    }
-    const auto *map_list = &from_list;
-    const auto *scan_list = &to_list;
-    bool map_is_from = true;
-    if (from_list.size() > to_list.size())
-    {
-        map_list = &to_list;
-        scan_list = &from_list;
-        map_is_from = false;
-    }
-    sjtu::unordered_map<int, int> train_index_map(map_list->size() * 2 + 1);
-    for (size_t i = 0; i < map_list->size(); ++i)
-    {
-        train_index_map.insert({(*map_list)[i].first, i});
-    }
+    sjtu::pair<sjtu::StringKey<41>, sjtu::StringKey<41>> segment_key(
+        sjtu::StringKey<41>(from.c_str()), sjtu::StringKey<41>(to.c_str()));
+    auto segment_list = trainSegmentIndex.visit(segment_key);
     std::string result;
     Date query_date(date);
-    for (const auto &scan_entry: *scan_list)
+    for (const auto &seg: segment_list)
     {
-        auto it = train_index_map.find(scan_entry.first);
-        if (it == train_index_map.end())
-            continue;
-        const auto *from_entry = map_is_from ? &from_list[it->second] : &scan_entry;
-        const auto *to_entry = map_is_from ? &scan_entry : &to_list[it->second];
-        auto from_index = from_entry->second;
-        auto to_index = to_entry->second;
-        auto train = trainBufferPool->get(from_entry->first);
-        if (from_index >= to_index)
-            continue; // invalid route since the train goes from from_index to to_index
+        auto from_index = seg.start_index;
+        auto to_index = seg.end_index;
+        auto train = trainBufferPool->get(seg.train_addr);
         AccurateTime earliest_depart_time =
                 AccurateTime(train.start_date, train.start_time) + train.depart_time_offset[from_index];
         AccurateTime latest_depart_time =
@@ -312,7 +294,7 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
             AccurateTime segment_depart =
                     route.depart_time + (train.depart_time_offset[i] - train.depart_time_offset[from_index]);
             SeatStatus key{};
-            key.train_addr = from_entry->first;
+            key.train_addr = seg.train_addr;
             key.station_index = i;
             key.date = segment_depart.date;
             auto seat_list = seat_manager.visit(key);
@@ -712,6 +694,7 @@ void TrainManager::clean()
     // TODO: Implement data cleanup
     trainIndex.clear();
     station_train_mapping.clear();
+    trainSegmentIndex.clear();
     seat_manager.clear();
     trainBufferPool->flush_all();
     trainDatabase.clear();
