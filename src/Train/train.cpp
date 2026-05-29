@@ -133,40 +133,6 @@ std::string TrainManager::releaseTrain(const std::string &train_id)
             trainSegmentIndex.insert(segment_key, seg);
         }
     }
-    auto next_date = [](const Date &current) {
-        Date next = current;
-        ++next.day;
-        if (next.month == 6 && next.day > 30)
-        {
-            next.month = 7;
-            next.day = 1;
-        }
-        else if (next.month == 7 && next.day > 31)
-        {
-            next.month = 8;
-            next.day = 1;
-        }
-        else if (next.month == 8 && next.day > 31)
-        {
-            next.month = 9;
-            next.day = 1;
-        }
-        return next;
-    };
-
-    for (Date run_date = temp.start_date; run_date <= temp.end_date; run_date = next_date(run_date))
-    {
-        AccurateTime start_time(run_date, temp.start_time);
-        for (int i = 0; i < temp.station_num - 1; ++i)
-        {
-            AccurateTime depart_time = start_time + temp.depart_time_offset[i];
-            SeatStatus key{};
-            key.train_addr = pos_list[0];
-            key.station_index = i;
-            key.date = depart_time.date;
-            seat_manager.insert(key, temp.total_seat_num);
-        }
-    }
     return "0";
 }
 

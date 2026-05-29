@@ -106,10 +106,15 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
         if (seat_list.empty())
-            continue;
-        int seat_left = seat_list[0] - num;
-        train_manager.seat_manager.remove(key, seat_list[0]);
-        train_manager.seat_manager.insert(key, seat_left);
+        {
+            train_manager.seat_manager.insert(key, train.total_seat_num - num);
+        }
+        else
+        {
+            int seat_left = seat_list[0] - num;
+            train_manager.seat_manager.remove(key, seat_list[0]);
+            train_manager.seat_manager.insert(key, seat_left);
+        }
     }
     Order order{};
     order.timestamp = accumulated_time + timestamp;
@@ -210,9 +215,18 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
         key.station_index = i;
         key.date = segment_depart.date;
         auto seat_list = train_manager.seat_manager.visit(key);
-        int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
-        train_manager.seat_manager.remove(key, seat_left);
-        train_manager.seat_manager.insert(key, seat_left + number);
+        if (seat_list.empty())
+        {
+            // Already at full capacity, nothing to restore
+            continue;
+        }
+        int new_seat = seat_list[0] + number;
+        train_manager.seat_manager.remove(key, seat_list[0]);
+        if (new_seat < train.total_seat_num)
+        {
+            train_manager.seat_manager.insert(key, new_seat);
+        }
+        // else: back to full capacity, keep entry deleted (sparse optimization)
     }
     order.state = orderState::REFUNDED;
     order_buffer_pool->put(order_addr, order);
@@ -271,9 +285,16 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                 key.station_index = i;
                 key.date = segment_depart.date;
                 auto seat_list = train_manager.seat_manager.visit(key);
-                int seat_left = seat_list.empty() ? train.total_seat_num : seat_list[0];
-                train_manager.seat_manager.remove(key, seat_left);
-                train_manager.seat_manager.insert(key, seat_left - w_order.num);
+                if (seat_list.empty())
+                {
+                    train_manager.seat_manager.insert(key, train.total_seat_num - w_order.num);
+                }
+                else
+                {
+                    int seat_left = seat_list[0] - w_order.num;
+                    train_manager.seat_manager.remove(key, seat_list[0]);
+                    train_manager.seat_manager.insert(key, seat_left);
+                }
             }
             fulfilled_orders.push_back({iter.second, w_order});
         }
