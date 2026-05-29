@@ -20,7 +20,7 @@ private:
 
 public:
     User() = default;
-    static unsigned long long generate_salt(std::string username)
+    static unsigned long long generate_salt(const std::string &username)
     {
         unsigned long long current_salt = 0;
         for (int i = 0; username[i]; i++)
@@ -33,7 +33,7 @@ public:
         }
         return current_salt;
     } // generate a unique salt for each user
-    static unsigned long long hash_password(std::string password, unsigned long long salt)
+    static unsigned long long hash_password(const std::string &password, unsigned long long salt)
     {
         unsigned long long h = salt ^ 1469598103934665603ULL;
 

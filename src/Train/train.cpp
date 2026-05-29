@@ -226,7 +226,7 @@ std::string TrainManager::queryTrain(const std::string &train_id, const std::str
 }
 
 std::string TrainManager::queryTicket(const std::string &from, const std::string &to, const std::string &date,
-                                      const std::string priority = "time")
+                                      const std::string &priority = "time")
 {
     sjtu::priority_queue<TrainRoute, TrainTimeGreater> *time_queue = nullptr;
     sjtu::priority_queue<TrainRoute, TrainPriceGreater> *price_queue = nullptr;
@@ -365,7 +365,7 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
 }
 
 std::string TrainManager::queryTransfer(const std::string &from, const std::string &to, const std::string &date,
-                                        const std::string priority = "time")
+                                        const std::string &priority = "time")
 {
     TrainTransferRouteTime *best_time_route = nullptr;
     TrainTransferRoutePrice *best_price_route = nullptr;

@@ -127,7 +127,7 @@ public:
      * @return 返回查询结果字符串
      */
     std::string queryTicket(const std::string &from, const std::string &to, const std::string &date,
-                            const std::string priority);
+                            const std::string &priority);
 
     /**
      * @brief 查询指定日期从某站到某站的换乘方案
@@ -138,7 +138,7 @@ public:
      * @return 返回查询结果字符串
      */
     std::string queryTransfer(const std::string &from, const std::string &to, const std::string &date,
-                              const std::string priority);
+                              const std::string &priority);
     /**
      * @brief 处理列车相关指令
      * @param tokens 解析后的指令参数列表

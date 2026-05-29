@@ -7,7 +7,7 @@ struct Time
     int minute;
     Time() : hour(0), minute(0) {}
     Time(int h, int m) : hour(h), minute(m) {}
-    Time(std::string time_str)
+    Time(const std::string &time_str)
     {
         hour = std::stoi(time_str.substr(0, 2));
         minute = std::stoi(time_str.substr(3, 2));
