@@ -9,7 +9,11 @@ namespace sjtu {
         StringKey() { std::memset(str, 0, N); }
         StringKey(const char* s) {
             std::memset(str, 0, N);
-            if (s) std::strncpy(str, s, N - 1);
+            if (s) {
+                size_t len = std::strlen(s);
+                if (len > N - 1) len = N - 1;
+                if (len) std::memcpy(str, s, len);
+            }
         }
         StringKey(const std::string &s) {
             std::memset(str, 0, N);

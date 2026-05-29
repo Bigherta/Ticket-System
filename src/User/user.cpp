@@ -125,10 +125,18 @@ std::string UserManager::modifyUser(const std::string &cur_User, const std::stri
         return "-1"; // 参数非法
     if (is_password_changed)
         targetUser.password = User::hash_password(password_, targetUser.salt);
-    if (is_name_changed)
-        std::strncpy(targetUser.name, name_.c_str(), sizeof(targetUser.name));
-    if (is_mailAddr_changed)
-        std::strncpy(targetUser.mailAddr, mailAddr_.c_str(), sizeof(targetUser.mailAddr));
+    if (is_name_changed) {
+        auto name_len = name_.size();
+        if (name_len >= sizeof(targetUser.name)) name_len = sizeof(targetUser.name) - 1;
+        std::memcpy(targetUser.name, name_.data(), name_len);
+        targetUser.name[name_len] = '\0';
+    }
+    if (is_mailAddr_changed) {
+        auto mail_len = mailAddr_.size();
+        if (mail_len >= sizeof(targetUser.mailAddr)) mail_len = sizeof(targetUser.mailAddr) - 1;
+        std::memcpy(targetUser.mailAddr, mailAddr_.data(), mail_len);
+        targetUser.mailAddr[mail_len] = '\0';
+    }
     if (is_privilege_changed)
         targetUser.privilege = std::stoi(privilege_str);
 

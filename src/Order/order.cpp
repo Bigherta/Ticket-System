@@ -8,9 +8,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     {
         return "-1";
     }
-    char train_id_c[21]{};
-    std::sprintf(train_id_c, "%s", train_id.c_str());
-    auto train_index_vec = train_manager.trainIndex.visit(train_id_c);
+    auto train_index_vec = train_manager.trainIndex.visit(train_id.c_str());
     if (train_index_vec.empty())
     {
         return "-1";
@@ -96,11 +94,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
             order.price = train.prices_prefix[to_index] - start_price;
             order.num = num;
             order.state = orderState::PENDING;
-            char username_c[21]{};
-            std::sprintf(username_c, "%s", username.c_str());
             int order_index = order_buffer_pool->new_page(order);
             order_buffer_pool->put(order_index, order);
-            user_order_map.insert(username_c, {order_index, order.timestamp});
+            user_order_map.insert(username , {order_index, order.timestamp});
             waiting_orders.insert(order.timestamp, order_index);
             return "queue";
         }
@@ -132,11 +128,9 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
     order.price = train.prices_prefix[to_index] - start_price;
     order.num = num;
     order.state = orderState::SUCCESS;
-    char username_c[21]{};
-    std::sprintf(username_c, "%s", username.c_str());
     int order_index = order_buffer_pool->new_page(order);
     order_buffer_pool->put(order_index, order);
-    user_order_map.insert(username_c, {order_index, order.timestamp});
+    user_order_map.insert(username, {order_index, order.timestamp});
     return std::to_string((long long) order.price * (long long) num);
 }
 
@@ -146,9 +140,7 @@ std::string OrderManager::queryOrder(const std::string &username) const
     {
         return "-1";
     }
-    char username_c[21]{};
-    std::sprintf(username_c, "%s", username.c_str());
-    auto order_list = user_order_map.visit(username_c);
+    auto order_list = user_order_map.visit(username);
     if (order_list.empty())
         return "0";
     std::string res;
@@ -170,9 +162,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
     {
         return "-1";
     }
-    char username_c[21]{};
-    std::sprintf(username_c, "%s", username.c_str());
-    auto order_list = user_order_map.visit(username_c);
+    auto order_list = user_order_map.visit(username);
     int order_index = (int) order_list.size() - order_id;
     if (order_index < 0 || order_index >= (int) order_list.size())
     {
@@ -194,9 +184,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
     auto start_place = order.from;
     auto end_place = order.to;
     int number = order.num;
-    char train_id[21]{};
-    std::sprintf(train_id, "%s", order.train_id);
-    auto train_index = train_manager.trainIndex.visit(train_id)[0];
+    auto train_index = train_manager.trainIndex.visit(order.train_id)[0];
     auto train = train_manager.trainBufferPool->get(train_index);
     int from_index = -1, to_index = -1;
     for (int i = 0; i < train.station_num; ++i)
@@ -237,7 +225,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
     for (const auto &iter: waiting_orders)
     {
         const auto &w_order = order_buffer_pool->get(iter.second);
-        if (std::strcmp(w_order.train_id, train_id) != 0)
+        if (std::strcmp(w_order.train_id, order.train_id) != 0)
             continue;
 
         int w_from_index = -1, w_to_index = -1;

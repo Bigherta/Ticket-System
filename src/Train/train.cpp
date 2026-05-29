@@ -44,11 +44,7 @@ std::string TrainManager::addTrain(const std::string &train_id, const std::strin
         !Validator::validate_number(seat_num, TokenType::SEATNUM))
         return "-1"; // Invalid parameters or train already exists
 
-    char train_id_key[21]{};
-    std::strncpy(train_id_key, train_id.c_str(), 20);
-    train_id_key[20] = '\0';
-
-    if (trainIndex.find(train_id_key))
+    if (trainIndex.find(train_id.c_str()))
         return "-1"; // train already exists
 
     Train newTrain;
@@ -56,7 +52,7 @@ std::string TrainManager::addTrain(const std::string &train_id, const std::strin
         return "-1"; // Invalid start time format
     if (!Validator::validate_saledate(sale_date, newTrain.start_date, newTrain.end_date))
         return "-1"; // Invalid sale date format
-    std::strncpy(newTrain.train_id, train_id_key, 20);
+    std::strncpy(newTrain.train_id, train_id.c_str(), 20);
     newTrain.train_id[20] = '\0';
     newTrain.station_num = std::stoi(station_num);
     newTrain.total_seat_num = std::stoi(seat_num);
@@ -72,7 +68,7 @@ std::string TrainManager::addTrain(const std::string &train_id, const std::strin
     newTrain.addTimeoffset(travel_list, stopover_list);
 
     int addr = trainBufferPool->new_page(newTrain);
-    trainIndex.insert(train_id_key, addr);
+    trainIndex.insert(train_id.c_str(), addr);
     return "0";
 }
 
@@ -80,10 +76,7 @@ std::string TrainManager::deleteTrain(const std::string &train_id)
 {
     if (!Validator::validate_trainid(train_id) || releasedTrains.find(train_id) != releasedTrains.end())
         return "-1"; // Invalid train ID
-    char train_id_key[21]{};
-    std::strncpy(train_id_key, train_id.c_str(), 20);
-    train_id_key[20] = '\0';
-    auto pos_list = trainIndex.visit(train_id_key);
+    auto pos_list = trainIndex.visit(train_id.c_str());
     if (pos_list.empty())
         return "-1"; // train does not exist
     Train temp = trainBufferPool->get(pos_list[0]);
@@ -92,7 +85,7 @@ std::string TrainManager::deleteTrain(const std::string &train_id)
         releasedTrains.emplace(train_id);
         return "-1"; // train has been released, cannot be deleted
     }
-    trainIndex.remove(train_id_key, pos_list[0]);
+    trainIndex.remove(train_id.c_str(), pos_list[0]);
     trainBufferPool->Delete(pos_list[0]);
     return "0";
 }
@@ -101,10 +94,7 @@ std::string TrainManager::releaseTrain(const std::string &train_id)
 {
     if (!Validator::validate_trainid(train_id) || releasedTrains.find(train_id) != releasedTrains.end())
         return "-1"; // Invalid train ID
-    char train_id_key[21]{};
-    std::strncpy(train_id_key, train_id.c_str(), 20);
-    train_id_key[20] = '\0';
-    auto pos_list = trainIndex.visit(train_id_key);
+    auto pos_list = trainIndex.visit(train_id.c_str());
     if (pos_list.empty())
         return "-1"; // train does not exist
     Train temp = trainBufferPool->get(pos_list[0]);
@@ -142,10 +132,7 @@ std::string TrainManager::queryTrain(const std::string &train_id, const std::str
     if (!Validator::validate_trainid(train_id))
         return "-1"; // Invalid parameters
 
-    char train_id_key[21]{};
-    std::strncpy(train_id_key, train_id.c_str(), 20);
-    train_id_key[20] = '\0';
-    auto pos_list = trainIndex.visit(train_id_key);
+    auto pos_list = trainIndex.visit(train_id.c_str());
     if (pos_list.empty())
         return "-1"; // train does not exist
 
@@ -227,6 +214,14 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
     auto segment_list = trainSegmentIndex.visit(segment_key);
     std::string result;
     Date query_date(date);
+    auto copy_fixed = [](char *dest, size_t capacity, const char *src) {
+        std::memset(dest, 0, capacity);
+        size_t len = std::strlen(src);
+        if (len > capacity - 1)
+            len = capacity - 1;
+        if (len)
+            std::memcpy(dest, src, len);
+    };
     for (const auto &seg: segment_list)
     {
         auto from_index = seg.start_index;
@@ -239,12 +234,9 @@ std::string TrainManager::queryTicket(const std::string &from, const std::string
         if (query_date < earliest_depart_time.date || latest_depart_time.date < query_date)
             continue; // train does not run on the given date
         TrainRoute route;
-        std::strncpy(route.train_id, train.train_id, 20);
-        route.train_id[20] = '\0';
-        std::strncpy(route.from, train.stations[from_index], 40);
-        route.from[40] = '\0';
-        std::strncpy(route.to, train.stations[to_index], 40);
-        route.to[40] = '\0';
+        copy_fixed(route.train_id, sizeof(route.train_id), train.train_id);
+        copy_fixed(route.from, sizeof(route.from), train.stations[from_index]);
+        copy_fixed(route.to, sizeof(route.to), train.stations[to_index]);
         int travel_minutes = train.arrive_time_offset[to_index] - train.depart_time_offset[from_index];
         int depart_minutes =
                 (train.start_time.hour * 60 + train.start_time.minute + train.depart_time_offset[from_index]) %
@@ -329,12 +321,8 @@ std::string TrainManager::queryTransfer(const std::string &from, const std::stri
     {
         return "-1"; // invalid priority
     }
-    char from_key[41]{};
-    char to_key[41]{};
-    std::sprintf(from_key, "%s", from.c_str());
-    std::sprintf(to_key, "%s", to.c_str());
-    auto from_list = station_train_mapping.visit(from_key);
-    auto to_list = station_train_mapping.visit(to_key);
+    auto from_list = station_train_mapping.visit(from.c_str());
+    auto to_list = station_train_mapping.visit(to.c_str());
     if (from_list.empty() || to_list.empty())
         return "0"; // no train available
     Date query_date(date);
