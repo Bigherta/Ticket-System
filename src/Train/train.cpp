@@ -7,9 +7,9 @@
 #include "../include/Validator/validator.hpp"
 
 TrainManager::TrainManager() :
-    trainIndex("trainIndex.dat", 130), station_train_mapping("stationTrainMapping.dat", 180),
-    trainSegmentIndex("trainSegmentIndex.dat", 260), seat_manager("seatManager.dat", 300),
-    trainBufferPool(new BufferPoolManager<Train>(160, trainDatabase))
+    trainIndex("trainIndex.dat", 200), station_train_mapping("stationTrainMapping.dat", 200),
+    trainSegmentIndex("trainSegmentIndex.dat", 500), seat_manager("seatManager.dat", 350),
+    trainBufferPool(new BufferPoolManager<Train>(300, trainDatabase))
 {
     trainDatabase.initialise("trainDatabase.dat");
 }
