@@ -78,11 +78,11 @@ private:
 
 public:
     OrderManager(UserManager &user_manager) :
-        user_order_map("user_order_bpt", 320), waiting_orders("waiting_orders", 80), user_manager(user_manager)
+        user_order_map("user_order_bpt", 130), waiting_orders("waiting_orders", 35), user_manager(user_manager)
     {
         order_info_memory_river.get_info(accumulated_time, 1);
         order_info_memory_river.initialise("order_info_memory_river");
-        order_buffer_pool = new BufferPoolManager<Order>(200, order_info_memory_river);
+        order_buffer_pool = new BufferPoolManager<Order>(80, order_info_memory_river);
     }
     ~OrderManager() { delete order_buffer_pool; }
     /**

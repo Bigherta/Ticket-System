@@ -438,7 +438,7 @@ private:
     }
 
 public:
-    BPT(const std::string &filename = "BPTree.dat", int bufferPoolSize = 500)
+    BPT(const std::string &filename = "BPTree.dat", int bufferPoolSize = 200)
     {
         BPTree.initialise(filename);
         BPTree.get_info(root_pos, 1);
