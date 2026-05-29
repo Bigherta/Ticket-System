@@ -1,6 +1,6 @@
 #include "../include/User/user.hpp"
 #include "../include/Validator/validator.hpp"
-UserManager::UserManager() : userIndex("userIndex.dat"), userBufferPool(1000, userDatabase) 
+UserManager::UserManager() : userIndex("userIndex.dat", 300), userBufferPool(200, userDatabase)
 { 
     userDatabase.initialise("userDatabase.dat"); 
 }
