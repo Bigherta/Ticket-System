@@ -106,8 +106,7 @@ std::string OrderManager::BuyTicket(int timestamp, TrainManager &train_manager, 
         if (seg_info[idx].exists)
         {
             int new_seat = seg_info[idx].seat_value - num;
-            train_manager.seat_manager.remove(seg_info[idx].key, seg_info[idx].seat_value);
-            train_manager.seat_manager.insert(seg_info[idx].key, new_seat);
+            train_manager.seat_manager.modify(seg_info[idx].key, seg_info[idx].seat_value, new_seat);
         }
         else
         {
@@ -281,8 +280,7 @@ std::string OrderManager::refundTicket(TrainManager &train_manager, const std::s
                 if (wseg_info[idx].exists)
                 {
                     int new_seat = wseg_info[idx].seat_value - w_order.num;
-                    train_manager.seat_manager.remove(wseg_info[idx].key, wseg_info[idx].seat_value);
-                    train_manager.seat_manager.insert(wseg_info[idx].key, new_seat);
+                    train_manager.seat_manager.modify(wseg_info[idx].key, wseg_info[idx].seat_value, new_seat);
                 }
                 else
                 {

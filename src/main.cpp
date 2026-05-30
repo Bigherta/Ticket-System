@@ -1,11 +1,25 @@
-#include <iostream>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include "include/Grammar/parser.hpp"
-#include "include/User/user.hpp"
-#include "include/Train/train.hpp"
 #include "include/Order/order.hpp"
-#define gc getchar_unlocked
+#include "include/Train/train.hpp"
+#include "include/User/user.hpp"
+
+char buf[1 << 20];
+size_t p = 0, len = 0;
+
+inline int gc()
+{
+    if (p == len)
+    {
+        len = fread(buf, 1, sizeof(buf), stdin);
+        p = 0;
+        if (len == 0)
+            return EOF;
+    }
+    return buf[p++];
+}
 /**
  * @brief 程序入口
  *
@@ -13,7 +27,7 @@
  * 逐行读取输入指令，并交给 Parser 执行
  */
 int main()
-{   
+{
     std::ios::sync_with_stdio(false);
     std::cin.tie(nullptr);
 
@@ -54,14 +68,17 @@ int main()
             len -= chunk;
         }
     };
-    
-    // fast input: read lines using getchar_unlocked
-    auto fast_getline = [](std::string &s)->bool {
+
+    // fast input: read lines using fread
+    auto fast_getline = [](std::string &s) -> bool {
         s.clear();
         int c = gc();
-        if (c == EOF) return false;
-        while (c != '\n' && c != EOF) {
-            if (c != '\r') s.push_back(char(c));
+        if (c == EOF)
+            return false;
+        while (c != '\n' && c != EOF)
+        {
+            if (c != '\r')
+                s.push_back(char(c));
             c = gc();
         }
         return true;

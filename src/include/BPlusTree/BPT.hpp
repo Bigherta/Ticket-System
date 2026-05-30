@@ -16,9 +16,8 @@ private:
     static constexpr int min_children_non_root_internal = (max_children + 1) / 2; // ceil(m / 2)
     static constexpr int min_internal_keys_non_root = min_children_non_root_internal - 1; // ceil(m / 2) - 1
     static constexpr int min_leaf_keys_non_root = (max_keys + 1) / 2; // ceil((m - 1) / 2)
-     static inline auto upper_bound_pair = [](const sjtu::pair<Key, Value> *arr, int size,
-                                             const sjtu::pair<Key, Value> &key)
-    {
+    static inline auto upper_bound_pair = [](const sjtu::pair<Key, Value> *arr, int size,
+                                             const sjtu::pair<Key, Value> &key) {
         int left = 0, right = size;
         while (left < right)
         {
@@ -31,8 +30,7 @@ private:
         return left;
     };
 
-    static inline auto lower_bound_key = [](const sjtu::pair<Key, Value> *arr, int size, const Key &key)
-    {
+    static inline auto lower_bound_key = [](const sjtu::pair<Key, Value> *arr, int size, const Key &key) {
         int left = 0, right = size;
         while (left < right)
         {
@@ -702,6 +700,27 @@ public:
             }
         }
         return true;
+    }
+    void modify(const Key &key, const Value &old_value, const Value &new_value) // only available when one key maps to one value
+    {
+        if (tree_size == 0)
+            return;
+        Node<order> node = bufferPool->get(root_pos, LOOKUP_TYPE);
+        sjtu::pair<Key, Value> keyValuePair(key, old_value);
+        int node_pos = root_pos;
+        int child_index;
+        while (!node.isLeaf)
+        {
+            child_index = upper_bound_pair(node.Keys, node.size, keyValuePair);
+            node_pos = node.children[child_index];
+            node = bufferPool->get(node_pos, INDEX_TYPE);
+        }
+        child_index = upper_bound_pair(node.Keys, node.size, keyValuePair) - 1;
+        if (child_index >= 0 && child_index < node.size && node.Keys[child_index] == keyValuePair)
+        {
+            node.Keys[child_index].second = new_value;
+            bufferPool->put(node_pos, node, SCAN_TYPE);
+        }
     }
     inline bool empty() const { return tree_size == 0; }
     void clear()
