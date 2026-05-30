@@ -705,6 +705,7 @@ public:
     {
         if (tree_size == 0)
             return;
+        sjtu::vector<int> trace_index;
         Node<order> node = bufferPool->get(root_pos, LOOKUP_TYPE);
         sjtu::pair<Key, Value> keyValuePair(key, old_value);
         int node_pos = root_pos;
@@ -712,6 +713,7 @@ public:
         while (!node.isLeaf)
         {
             child_index = upper_bound_pair(node.Keys, node.size, keyValuePair);
+            trace_index.push_back(child_index);
             node_pos = node.children[child_index];
             node = bufferPool->get(node_pos, INDEX_TYPE);
         }
@@ -720,6 +722,8 @@ public:
         {
             node.Keys[child_index].second = new_value;
             bufferPool->put(node_pos, node, SCAN_TYPE);
+            if (child_index == 0)
+                fix_parent(node_pos, node.Keys[0], trace_index);
         }
     }
     inline bool empty() const { return tree_size == 0; }
