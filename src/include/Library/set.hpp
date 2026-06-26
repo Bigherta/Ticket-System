@@ -5,8 +5,8 @@
 #define SJTU_SET_HPP
 
 // only for std::less<T>
+#include "utility.hpp"
 #include "exceptions.hpp"
-
 namespace sjtu
 {
 
@@ -14,143 +14,119 @@ namespace sjtu
     class set
     {
 
-    public:
-        /**
-         * the internal type of data.
-         * it should have a default constructor, a copy constructor.
-         * You can use sjtu::set as value_type by typedef.
-         */
-        Compare comp;
-        typedef Key value_type;
-        struct node
+    private:
+        enum class Color
         {
-            value_type key_value;
-            node *left;
-            node *right;
-            node *parent;
-            int height;
-            node() : left(nullptr), right(nullptr), parent(nullptr), height(1) {}
-            node(const value_type &key_value_, node *parent_ = nullptr, node *left_ = nullptr, node *right_ = nullptr) :
-                key_value(key_value_), left(left_), right(right_), parent(parent_), height(1)
+            RED,
+            BLACK
+        };
+        Compare comp;
+        struct node_base
+        {
+            node_base *left;
+            node_base *right;
+            node_base *parent;
+            Color color;
+            node_base(Color color_ = Color::BLACK, node_base *parent_ = nullptr, node_base *left_ = nullptr,
+                      node_base *right_ = nullptr) : color(color_), parent(parent_), left(left_), right(right_)
+            {
+            }
+        };
+        struct node : public node_base
+        {
+            Key key_value;
+            node(const Key &key_value_, Color color_ = Color::RED, node *parent_ = nullptr,
+                 node *left_ = nullptr, node *right_ = nullptr) :
+                node_base(color_, parent_, left_, right_), key_value(key_value_)
             {
             }
             ~node() = default;
         };
-        node *root;
-        node *leftmost;
-        node *rightmost;
+        node_base *root;
+        node_base *Begin;
+        node_base *End;
         std::size_t set_size;
-        int height(node *Node) const { return Node ? Node->height : 0; }
-        void update_height(node *Node)
-        {
-            if (Node)
-                Node->height = std::max(height(Node->left), height(Node->right)) + 1;
-        }
-        int balance_factor(node *Node) const { return height(Node->left) - height(Node->right); }
-        void rebalance_from(node *Node)
-        {
-            while (Node)
-            {
-                int old_height = Node->height;
-                int bf = balance_factor(Node);
-                if (bf > 1 || bf < -1)
-                {
-                    balance(Node);
-                    Node = Node->parent;
-                    continue;
-                }
-
-                update_height(Node);
-                if (Node->height == old_height)
-                    break;
-                Node = Node->parent;
-            }
-        }
         node *clonetree(const node *other_root)
         {
             if (!other_root)
                 return nullptr;
-            node *new_root = new node(other_root->key_value);
+            node *new_root = new node(other_root->key_value, other_root->color);
             if (other_root->left)
             {
-                new_root->left = clonetree(other_root->left);
+                new_root->left = clonetree(static_cast<const node *>(other_root->left));
                 new_root->left->parent = new_root;
             }
             if (other_root->right)
             {
-                new_root->right = clonetree(other_root->right);
+                new_root->right = clonetree(static_cast<const node *>(other_root->right));
                 new_root->right->parent = new_root;
             }
-            new_root->height = std::max(new_root->left ? new_root->left->height : 0,
-                                        new_root->right ? new_root->right->height : 0) +
-                               1;
             return new_root;
         }
         void cleartree(node *clear_root)
         {
             if (!clear_root)
                 return;
-            cleartree(clear_root->left);
-            cleartree(clear_root->right);
+            cleartree(static_cast<node *>(clear_root->left));
+            cleartree(static_cast<node *>(clear_root->right));
             delete clear_root;
         }
-        static node *next_node(const node *cur)
+        static node *next_node(const node_base *cur)
         {
             if (cur->right)
             {
-                node *temp = const_cast<node *>(cur->right);
+                node_base *temp = const_cast<node_base *>(cur->right);
                 while (temp->left)
                     temp = temp->left;
-                return temp;
+                return static_cast<node *>(temp);
             }
             else
             {
-                node *temp = const_cast<node *>(cur);
+                node_base *temp = const_cast<node_base *>(cur);
                 while (temp->parent && temp->parent->right == temp)
                     temp = temp->parent;
-                return temp->parent;
+                return static_cast<node *>(temp->parent);
             }
-            return nullptr;
         }
-        static node *prev_node(const node *cur)
+        static node *prev_node(const node_base *cur)
         {
             if (cur->left)
             {
-                node *temp = const_cast<node *>(cur->left);
+                node_base *temp = const_cast<node_base *>(cur->left);
                 while (temp->right)
                     temp = temp->right;
-                return temp;
+                return static_cast<node *>(temp);
             }
             else
             {
-                node *temp = const_cast<node *>(cur);
+                node_base *temp = const_cast<node_base *>(cur);
                 while (temp->parent && temp->parent->left == temp)
                     temp = temp->parent;
-                return temp->parent;
+                return static_cast<node *>(temp->parent);
             }
         }
-        static node *first_node(const node *root)
+        static node *first_node(const node_base *rt)
         {
-            if (!root)
+            if (!rt)
                 return nullptr;
-            node *cur = const_cast<node *>(root);
+            node_base *cur = const_cast<node_base *>(rt);
             while (cur->left)
                 cur = cur->left;
-            return cur;
+            return static_cast<node *>(cur);
         }
-        static node *last_node(const node *root)
+        static node *last_node(const node_base *rt)
         {
-            if (!root)
+            if (!rt)
                 return nullptr;
-            node *cur = const_cast<node *>(root);
+            node_base *cur = const_cast<node_base *>(rt);
             while (cur->right)
                 cur = cur->right;
-            return cur;
+            return static_cast<node *>(cur);
         }
-        void left_rotate(node *Node)
+        void left_rotate(node_base *Node)
         {
-            node *parent_ = Node->parent;
-            node *new_parent_ = Node->right;
+            node_base *parent_ = Node->parent;
+            node_base *new_parent_ = Node->right;
             Node->right = new_parent_->left;
             if (new_parent_->left)
                 new_parent_->left->parent = Node;
@@ -163,13 +139,11 @@ namespace sjtu
                 parent_->right = new_parent_;
             new_parent_->left = Node;
             Node->parent = new_parent_;
-            Node->height = std::max(height(Node->left), height(Node->right)) + 1;
-            new_parent_->height = std::max(height(new_parent_->left), height(new_parent_->right)) + 1;
         }
-        void right_rotate(node *Node)
+        void right_rotate(node_base *Node)
         {
-            node *parent_ = Node->parent;
-            node *new_parent_ = Node->left;
+            node_base *parent_ = Node->parent;
+            node_base *new_parent_ = Node->left;
             Node->left = new_parent_->right;
             if (new_parent_->right)
                 new_parent_->right->parent = Node;
@@ -182,49 +156,173 @@ namespace sjtu
                 parent_->right = new_parent_;
             new_parent_->right = Node;
             Node->parent = new_parent_;
-            Node->height = std::max(height(Node->left), height(Node->right)) + 1;
-            new_parent_->height = std::max(height(new_parent_->left), height(new_parent_->right)) + 1;
         }
-        void balance(node *Node)
+
+        void insert_rebalance(node_base *Node)
         {
-            switch (balance_factor(Node))
+            if (!Node)
+                return;
+            if (!Node->parent)
             {
-                case 2: {
-                    int left_bf = balance_factor(Node->left);
-                    if (left_bf >= 0)
+                Node->color = Color::BLACK;
+                return;
+            }
+            if (Node->parent->color == Color::BLACK)
+                return;
+            node_base *parent_ = Node->parent;
+            node_base *grandparent_ = parent_->parent;
+            if (!grandparent_)
+            {
+                parent_->color = Color::BLACK;
+                return;
+            }
+            node_base *uncle_ = (grandparent_->left == parent_) ? grandparent_->right : grandparent_->left;
+            if (uncle_ && uncle_->color == Color::RED)
+            {
+                parent_->color = Color::BLACK;
+                uncle_->color = Color::BLACK;
+                grandparent_->color = Color::RED;
+                insert_rebalance(grandparent_);
+            }
+            else
+            {
+                if (grandparent_->left == parent_)
+                {
+                    if (parent_->right == Node)
                     {
-                        right_rotate(Node);
+                        left_rotate(parent_);
+                        Node = parent_;
+                        parent_ = static_cast<node_base *>(Node->parent);
                     }
-                    else
-                    {
-                        left_rotate(Node->left);
-                        right_rotate(Node);
-                    }
-                    break;
+                    right_rotate(grandparent_);
                 }
-                case -2: {
-                    int right_bf = balance_factor(Node->right);
-                    if (right_bf <= 0)
+                else
+                {
+                    if (parent_->left == Node)
                     {
-                        left_rotate(Node);
+                        right_rotate(parent_);
+                        Node = parent_;
+                        parent_ = static_cast<node_base *>(Node->parent);
                     }
-                    else
-                    {
-                        right_rotate(Node->right);
-                        left_rotate(Node);
-                    }
-                    break;
+                    left_rotate(grandparent_);
                 }
-                default:
-                    break;
+                parent_->color = Color::BLACK;
+                grandparent_->color = Color::RED;
             }
         }
+
+        void delete_rebalance(node_base *Node)
+        {
+            if (!Node)
+                return;
+            while (Node != root)
+            {
+                node_base *parent_ = Node->parent;
+                node_base *sibling_ = (parent_->left == Node) ? parent_->right : parent_->left;
+
+                // null sibling is implicitly BLACK — treat as "sibling black with both children black"
+                if (!sibling_)
+                {
+                    if (parent_->color == Color::RED)
+                    {
+                        parent_->color = Color::BLACK;
+                        break;
+                    }
+                    else
+                    {
+                        Node = parent_;
+                        continue;
+                    }
+                }
+
+                if (sibling_->color == Color::RED)
+                {
+                    sibling_->color = Color::BLACK;
+                    parent_->color = Color::RED;
+                    if (parent_->left == Node)
+                        left_rotate(parent_);
+                    else
+                        right_rotate(parent_);
+                    continue;
+                }
+                else
+                {
+                    bool is_sibling_left_red = sibling_->left && sibling_->left->color == Color::RED;
+                    bool is_sibling_right_red = sibling_->right && sibling_->right->color == Color::RED;
+                    if (!is_sibling_left_red && !is_sibling_right_red)
+                    {
+                        sibling_->color = Color::RED;
+                        if (parent_->color == Color::RED)
+                        {
+                            parent_->color = Color::BLACK;
+                            break;
+                        }
+                        else
+                        {
+                            Node = parent_;
+                            continue;
+                        }
+                    }
+                    bool is_sibling_left = parent_->left == sibling_;
+                    if (is_sibling_left && is_sibling_left_red)
+                    {
+                        sibling_->left->color = sibling_->color;
+                        sibling_->color = parent_->color;
+                        parent_->color = Color::BLACK;
+                        right_rotate(parent_);
+                        break;
+                    }
+                    else if (!is_sibling_left && is_sibling_right_red)
+                    {
+                        sibling_->right->color = sibling_->color;
+                        sibling_->color = parent_->color;
+                        parent_->color = Color::BLACK;
+                        left_rotate(parent_);
+                        break;
+                    }
+                    else if (is_sibling_left && is_sibling_right_red)
+                    {
+                        sibling_->right->color = parent_->color;
+                        parent_->color = Color::BLACK;
+                        left_rotate(sibling_);
+                        right_rotate(parent_);
+                        break;
+                    }
+                    else if (!is_sibling_left && is_sibling_left_red)
+                    {
+                        sibling_->left->color = parent_->color;
+                        parent_->color = Color::BLACK;
+                        right_rotate(sibling_);
+                        left_rotate(parent_);
+                        break;
+                    }
+                }
+            }
+            root->color = Color::BLACK;
+        }
+
+        /**
+         * Replace subtree rooted at u with subtree rooted at v.
+         * u's parent becomes v's parent; u is not freed.
+         */
+        void transplant(node_base *u, node_base *v)
+        {
+            if (!u->parent)
+                root = v;
+            else if (u == u->parent->left)
+                u->parent->left = v;
+            else
+                u->parent->right = v;
+            if (v)
+                v->parent = u->parent;
+        }
+        public:
         /**
          * see BidirectionalIterator at CppReference for help.
          *
-         * if there is anything wrong throw invalid_iterator.
+         * if there is anything wrong throw std::runtime_error.
          *     like it = set.begin(); --it;
-         *       or it = set.end(); ++end();
+         *       or it = set.end(); ++it;
          */
         class iterator
         {
@@ -291,12 +389,12 @@ namespace sjtu
                 auto temp = *this;
                 if (!data)
                 {
-                    if (!parent->rightmost)
+                    if (!parent->End)
                         throw invalid_iterator();
-                    data = parent->rightmost;
+                    data = static_cast<node*>(parent->End);
                     return temp;
                 }
-                if (data == parent->leftmost)
+                if (data == parent->Begin)
                     return temp;
                 data = prev_node(data);
                 return temp;
@@ -311,18 +409,18 @@ namespace sjtu
                     throw invalid_iterator();
                 if (!data)
                 {
-                    if (!parent->rightmost)
+                    if (!parent->End)
                         throw invalid_iterator();
-                    data = parent->rightmost;
+                    data = static_cast<node*>(parent->End);
                     return *this;
                 }
-                if (data == parent->leftmost)
+                if (data == parent->Begin)
                     return *this;
                 data = prev_node(data);
                 return *this;
             }
 
-            const value_type &operator*() const
+            const Key &operator*() const
             {
                 if (!data)
                     throw invalid_iterator();
@@ -337,7 +435,7 @@ namespace sjtu
 
             bool operator!=(const iterator &rhs) const { return data != rhs.data || parent != rhs.parent; }
 
-            const value_type *operator->() const noexcept { return &data->key_value; }
+            const Key *operator->() const noexcept { return &data->key_value; }
         };
         /**
          * TODO two constructors
@@ -345,29 +443,29 @@ namespace sjtu
         set()
         {
             root = nullptr;
-            leftmost = nullptr;
-            rightmost = nullptr;
+            Begin = nullptr;
+            End = nullptr;
             set_size = 0;
         }
 
         set(const set &other)
         {
             comp = other.comp;
-            root = clonetree(other.root);
-            leftmost = first_node(root);
-            rightmost = last_node(root);
+            root = clonetree(static_cast<const node*>(other.root));
+            Begin = first_node(root);
+            End = last_node(root);
             set_size = other.set_size;
         }
         set(set &&other) noexcept
         {
             comp = std::move(other.comp);
             root = other.root;
-            leftmost = other.leftmost;
-            rightmost = other.rightmost;
+            Begin = other.Begin;
+            End = other.End;
             set_size = other.set_size;
             other.root = nullptr;
-            other.leftmost = nullptr;
-            other.rightmost = nullptr;
+            other.Begin = nullptr;
+            other.End = nullptr;
             other.set_size = 0;
         }
         /**
@@ -377,11 +475,11 @@ namespace sjtu
         {
             if (this == &other)
                 return *this;
-            cleartree(root);
+            cleartree(static_cast<node*>(root));
             comp = other.comp;
-            root = clonetree(other.root);
-            leftmost = first_node(root);
-            rightmost = last_node(root);
+            root = clonetree(static_cast<const node*>(other.root));
+            Begin = first_node(root);
+            End = last_node(root);
             set_size = other.set_size;
             return *this;
         }
@@ -390,15 +488,15 @@ namespace sjtu
         {
             if (this == &other)
                 return *this;
-            cleartree(root);
+            cleartree(static_cast<node*>(root));
             comp = std::move(other.comp);
             root = other.root;
-            leftmost = other.leftmost;
-            rightmost = other.rightmost;
+            Begin = other.Begin;
+            End = other.End;
             set_size = other.set_size;
             other.root = nullptr;
-            other.leftmost = nullptr;
-            other.rightmost = nullptr;
+            other.Begin = nullptr;
+            other.End = nullptr;
             other.set_size = 0;
             return *this;
         }
@@ -406,12 +504,12 @@ namespace sjtu
         /**
          * TODO Destructors
          */
-        ~set() { cleartree(root); }
+        ~set() { cleartree(static_cast<node*>(root)); }
 
         /**
          * return a iterator to the beginning
          */
-        iterator begin() const noexcept { return iterator(leftmost, this); }
+        iterator begin() const noexcept { return iterator(static_cast<node*>(Begin), this); }
 
         /**
          * return a iterator to the end
@@ -428,10 +526,10 @@ namespace sjtu
          */
         void clear()
         {
-            cleartree(root);
+            cleartree(static_cast<node*>(root));
             root = nullptr;
-            leftmost = nullptr;
-            rightmost = nullptr;
+            Begin = nullptr;
+            End = nullptr;
             set_size = 0;
         }
 
@@ -442,45 +540,44 @@ namespace sjtu
          *   the second one is true if insert successfully, or false.
          */
         template<class... Args>
-        std::pair<iterator, bool> emplace(Args &&...args)
+        sjtu::pair<iterator, bool> emplace(Args &&...args)
         {
-            value_type value(std::forward<Args>(args)...);
+            Key value(std::forward<Args>(args)...);
             if (root == nullptr)
             {
-                root = new node(value);
-                leftmost = root;
-                rightmost = root;
+                root = new node(value, Color::BLACK);
+                Begin = root;
+                End = root;
                 set_size++;
-                return {iterator(root, this), true};
+                return {iterator(static_cast<node*>(root), this), true};
             }
-            node *cur = root;
+            node *cur = static_cast<node*>(root);
             node *parent_ = nullptr;
             while (cur)
             {
                 parent_ = cur;
                 if (comp(value, cur->key_value))
-                    cur = cur->left;
+                    cur = static_cast<node*>(cur->left);
                 else if (comp(cur->key_value, value))
-                    cur = cur->right;
+                    cur = static_cast<node*>(cur->right);
                 else
                 {
                     return {iterator(cur, this), false};
                 }
             }
             set_size++;
-            cur = new node(value, parent_);
+            node *new_node = new node(value, Color::RED, parent_);
             const bool is_left_child = comp(value, parent_->key_value);
             if (is_left_child)
-                parent_->left = cur;
+                parent_->left = new_node;
             else
-                parent_->right = cur;
-            if (!leftmost || comp(cur->key_value, leftmost->key_value))
-                leftmost = cur;
-            if (!rightmost || comp(rightmost->key_value, cur->key_value))
-                rightmost = cur;
-            iterator result(cur, this);
-
-            rebalance_from(parent_);
+                parent_->right = new_node;
+            if (comp(new_node->key_value, static_cast<node*>(Begin)->key_value))
+                Begin = new_node;
+            if (comp(static_cast<node*>(End)->key_value, new_node->key_value))
+                End = new_node;
+            iterator result(new_node, this);
+            insert_rebalance(new_node);
             return {result, true};
         }
 
@@ -491,133 +588,94 @@ namespace sjtu
          */
         size_t erase(iterator pos)
         {
-            if (pos == end() || pos.get_parent() != this)
+            if (pos.get_parent() != this || pos.get_node() == nullptr)
                 throw invalid_iterator();
-            node *cur = pos.get_node();
-            const bool erase_leftmost = (cur == leftmost);
-            const bool erase_rightmost = (cur == rightmost);
-            node *parent_ = cur->parent;
-            node *start_balance_node = parent_;
-            // case 1: no child
-            if (!cur->left && !cur->right)
+
+            node *target = pos.get_node();
+
+            // ── Determine which node will be physically removed from the tree ──
+            // If target has ≤1 child, target itself is removed.
+            // If target has two children, its successor is physically extracted.
+            node *removed;
+            if (target->left == nullptr || target->right == nullptr)
+                removed = target;
+            else
+                removed = first_node(target->right);
+
+            // ── Save removed-node position for fixup when replacement is null ──
+            node_base *fix_parent = removed->parent;
+            bool fix_is_left = fix_parent && (fix_parent->left == removed);
+
+            // ── Standard RB-tree deletion (CLRS Chapter 13) ──
+            node_base *replacement; // child that replaces 'removed' in the tree
+            Color removed_color;
+
+            if (target->left == nullptr)
             {
-                if (!parent_)
-                {
-                    root = nullptr;
-                }
-                else if (parent_->left == cur)
-                    parent_->left = nullptr;
-                else
-                    parent_->right = nullptr;
-                delete cur;
-                set_size--;
+                replacement = target->right;
+                transplant(target, target->right);
+                removed_color = target->color;
+            }
+            else if (target->right == nullptr)
+            {
+                replacement = target->left;
+                transplant(target, target->left);
+                removed_color = target->color;
             }
             else
             {
-                // case 2: one child
-                if (!cur->left || !cur->right)
+                // Two children: successor takes target's place, no key copy needed
+                node *successor = removed; // = first_node(target->right)
+                removed_color = successor->color;
+                replacement = successor->right;
+
+                // Save successor's original parent / side BEFORE any transplant
+                fix_parent = successor->parent;
+                fix_is_left = (fix_parent->left == successor);
+
+                if (successor->parent == target)
                 {
-                    node *child = cur->left ? cur->left : cur->right;
-                    if (!parent_)
-                    {
-                        root = child;
-                        child->parent = nullptr;
-                    }
-                    else if (parent_->left == cur)
-                    {
-                        parent_->left = child;
-                        child->parent = parent_;
-                    }
-                    else
-                    {
-                        parent_->right = child;
-                        child->parent = parent_;
-                    }
-                    delete cur;
-                    set_size--;
+                    if (replacement)
+                        replacement->parent = successor;
+                    // After transplant(target, successor), the null at successor->right
+                    // has parent = successor (now at target's old position), side = right
+                    fix_parent = successor;
+                    fix_is_left = false;
                 }
-                // case 3: two children
                 else
                 {
-                    node *successor = next_node(cur);
-                    node *successor_parent = successor->parent;
-                    node *successor_child = successor->right;
-                    node *left_child = cur->left;
-                    node *right_child = cur->right;
-
-                    // pick the successor off the tree
-                    if (successor_parent != cur)
-                    {
-                        start_balance_node = successor_parent;
-                        successor_parent->left = successor_child;
-                        if (successor_child)
-                            successor_child->parent = successor_parent;
-                    }
-                    else
-                    {
-                        start_balance_node = successor;
-                        successor_parent->right = successor_child;
-                        if (successor_child)
-                            successor_child->parent = successor_parent;
-                    }
-
-                    // replace cur with successor
-                    successor->parent = parent_;
-                    if (!parent_)
-                    {
-                        root = successor;
-                    }
-                    else if (parent_->left == cur)
-                        parent_->left = successor;
-                    else
-                        parent_->right = successor;
-
-                    // replace successor's left and right child with cur's left and right child
-                    successor->left = left_child;
-                    if (left_child)
-                        left_child->parent = successor;
-                    if (successor_parent != cur)
-                    {
-                        successor->right = right_child;
-                        if (right_child)
-                            right_child->parent = successor;
-                    }
-                    else
-                    {
-                        successor->right = successor_child;
-                        if (successor_child)
-                            successor_child->parent = successor;
-                    }
-                    delete cur;
-                    set_size--;
+                    transplant(successor, successor->right);
+                    successor->right = target->right;
+                    successor->right->parent = successor;
                 }
+                transplant(target, successor);
+                successor->left = target->left;
+                successor->left->parent = successor;
+                successor->color = target->color;
             }
+
+            // ── Fixup ──
+            if (removed_color == Color::BLACK)
+                delete_rebalance(replacement);
+
+            // ── Save whether Begin/End are being removed (compare before delete) ──
+            bool removing_begin = (removed == Begin);
+            bool removing_end   = (removed == End);
+
+            delete target;
+            --set_size;
+
             if (set_size == 0)
             {
-                leftmost = nullptr;
-                rightmost = nullptr;
+                Begin = nullptr;
+                End   = nullptr;
             }
             else
             {
-                if (erase_leftmost)
-                    leftmost = first_node(root);
-                if (erase_rightmost)
-                    rightmost = last_node(root);
-            }
-            while (start_balance_node)
-            {
-                int old_height = start_balance_node->height;
-                int bf = balance_factor(start_balance_node);
-                if (bf > 1 || bf < -1)
-                {
-                    balance(start_balance_node);
-                    start_balance_node = start_balance_node->parent;
-                    continue;
-                }
-                update_height(start_balance_node);
-                if (start_balance_node->height == old_height)
-                    break;
-                start_balance_node = start_balance_node->parent;
+                if (removing_begin)
+                    Begin = first_node(root);
+                if (removing_end)
+                    End   = last_node(root);
             }
             return 1;
         }
@@ -630,13 +688,13 @@ namespace sjtu
          */
         iterator find(const Key &key) const
         {
-            node *cur = root;
+            node *cur = static_cast<node*>(root);
             while (cur)
             {
                 if (comp(key, cur->key_value))
-                    cur = cur->left;
+                    cur = static_cast<node*>(cur->left);
                 else if (comp(cur->key_value, key))
-                    cur = cur->right;
+                    cur = static_cast<node*>(cur->right);
                 else
                     return iterator(cur, this);
             }
@@ -645,13 +703,13 @@ namespace sjtu
 
         size_t erase(const Key &key)
         {
-            node *cur = root;
+            node *cur = static_cast<node*>(root);
             while (cur)
             {
                 if (comp(key, cur->key_value))
-                    cur = cur->left;
+                    cur = static_cast<node*>(cur->left);
                 else if (comp(cur->key_value, key))
-                    cur = cur->right;
+                    cur = static_cast<node*>(cur->right);
                 else
                 {
                     iterator it(cur, this);
@@ -664,17 +722,17 @@ namespace sjtu
 
         iterator lower_bound(const Key &key) const
         {
-            node *cur = root;
+            node *cur = static_cast<node*>(root);
             node *ans = nullptr;
             while (cur)
             {
                 if (!comp(cur->key_value, key))
                 {
                     ans = cur;
-                    cur = cur->left;
+                    cur = static_cast<node*>(cur->left);
                 }
                 else
-                    cur = cur->right;
+                    cur = static_cast<node*>(cur->right);
             }
             if (ans)
                 return iterator(ans, this);
@@ -683,17 +741,17 @@ namespace sjtu
 
         iterator upper_bound(const Key &key) const
         {
-            node *cur = root;
+            node *cur = static_cast<node*>(root);
             node *ans = nullptr;
             while (cur)
             {
                 if (comp(key, cur->key_value))
                 {
                     ans = cur;
-                    cur = cur->left;
+                    cur = static_cast<node*>(cur->left);
                 }
                 else
-                    cur = cur->right;
+                    cur = static_cast<node*>(cur->right);
             }
             if (ans)
                 return iterator(ans, this);
@@ -716,6 +774,6 @@ namespace sjtu
     };
 
 } // namespace sjtu
-template <typename T>
-using set = sjtu::set<T>;
+template <typename T, typename Compare = std::less<T>>
+using set = sjtu::set<T, Compare>;
 #endif
